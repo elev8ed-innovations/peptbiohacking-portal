@@ -1,81 +1,103 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Navbar from '../../components/Navbar'
 
-export default function DoctorDashboard({ profile }) {
-  const [patients, setPatients] = useState([])
+export default function DoctorDashboard() {
+  const [profile, setProfile] = useState(null)
   const [consultations, setConsultations] = useState([])
   const [loading, setLoading] = useState(true)
-  const navigate = useNavigate()
 
   useEffect(() => {
-    async function load() {
-      const [pRes, cRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('role', 'patient').order('created_at', { ascending: false }),
-        supabase.from('consultations').select('*, profiles(full_name)').order('created_at', { ascending: false }).limit(10),
-      ])
-      setPatients(pRes.data || [])
-      setConsultations(cRes.data || [])
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setProfile(p)
+      const { data: c } = await supabase.from('consultations').select('*, profiles!patient_id(full_name, email)')
+        .order('created_at', { ascending: false }).limit(10)
+      setConsultations(c || [])
       setLoading(false)
     }
-    load()
+    init()
   }, [])
 
   const stats = [
-    { label: 'Pacientes', value: patients.length, color: 'text-teal' },
-    { label: 'Consultas', value: consultations.length, color: 'text-gold' },
-    { label: 'Activos Hoy', value: consultations.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length, color: 'text-white' },
+    { label: 'Consultas totales', value: consultations.length, color: 'text-teal' },
+    { label: 'Este mes', value: consultations.filter(c => new Date(c.created_at).getMonth() === new Date().getMonth()).length, color: 'text-gold' },
+    { label: 'Activos', value: consultations.filter(c => c.status === 'active').length, color: 'text-teal' },
   ]
 
   return (
-    <div className="min-h-screen">
-      <Navbar profile={profile} />
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen bg-navy">
+      <Navbar role="doctor" />
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8 flex items-start justify-between">
           <div>
-            <h1 className="font-display text-3xl text-white">Dashboard</h1>
-            <p className="text-white/40 text-sm mt-1">Dr. {profile?.full_name}</p>
+            <h1 className="font-display text-3xl text-white font-light">
+              Bienvenido, <span className="text-teal">Dr. {profile?.full_name?.split(' ')[1] || 'Doctor'}</span>
+            </h1>
+            <p className="text-white/40 mt-1 text-sm">Panel de control médico · PeptBiohacking</p>
           </div>
-          <button onClick={() => navigate('/doctor/consulta/nueva')} className="btn-primary text-sm">
-            + Nueva Consulta
-          </button>
+          <Link to="/doctor/consulta/nueva" className="btn-primary w-auto px-6 text-sm font-body">
+            + Nueva consulta
+          </Link>
         </div>
 
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          {stats.map(s => (
-            <div key={s.label} className="card text-center">
-              <div className={`font-display text-4xl font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-white/50 text-xs mt-1">{s.label}</div>
+          {stats.map((s, i) => (
+            <div key={i} className="card text-center">
+              <p className={`font-display text-4xl font-light ${s.color}`}>{loading ? '—' : s.value}</p>
+              <p className="text-white/40 text-xs mt-1 uppercase tracking-wider">{s.label}</p>
             </div>
           ))}
         </div>
 
-        <h2 className="font-display text-xl text-white mb-4">Pacientes Recientes</h2>
-        {loading ? (
-          <div className="text-white/30 text-sm">Cargando...</div>
-        ) : patients.length === 0 ? (
-          <div className="card text-center text-white/30 py-12">
-            <p>Sin pacientes aún.</p>
-            <p className="text-xs mt-2">Los pacientes aparecen aquí al registrarse.</p>
+        {/* Recent consultations */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-display text-xl text-white">Consultas recientes</h2>
+            <div className="w-8 h-px bg-gold" />
           </div>
-        ) : (
-          <div className="space-y-2">
-            {patients.map(p => (
-              <div
-                key={p.id}
-                onClick={() => navigate(`/doctor/paciente/${p.id}`)}
-                className="card hover:border-teal/40 cursor-pointer transition-colors flex items-center justify-between"
-              >
-                <div>
-                  <div className="font-medium text-white">{p.full_name || 'Sin nombre'}</div>
-                  <div className="text-white/40 text-xs">{p.email}</div>
-                </div>
-                <span className="text-white/20 text-xs">{new Date(p.created_at).toLocaleDateString('es-MX')}</span>
-              </div>
-            ))}
-          </div>
-        )}
+
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-teal border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : consultations.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-white/30 text-sm">No hay consultas aún.</p>
+              <Link to="/doctor/consulta/nueva" className="text-teal text-sm hover:underline mt-2 block">
+                Crear primera consulta →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {consultations.map(c => (
+                <Link key={c.id} to={`/doctor/paciente/${c.patient_id}`}
+                  className="flex items-center justify-between p-4 rounded-xl border border-white/5 hover:border-teal/30 hover:bg-white/5 transition-all duration-200 group">
+                  <div>
+                    <p className="text-white text-sm font-medium group-hover:text-teal transition-colors">
+                      {c.profiles?.full_name || 'Paciente'}
+                    </p>
+                    <p className="text-white/40 text-xs mt-0.5">{c.profiles?.email}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                      c.status === 'active' ? 'border-teal/30 text-teal bg-teal/10' : 'border-white/10 text-white/30'
+                    }`}>
+                      {c.status === 'active' ? 'Activo' : 'Completado'}
+                    </span>
+                    <p className="text-white/30 text-xs">
+                      {new Date(c.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

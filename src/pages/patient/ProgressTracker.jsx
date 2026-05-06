@@ -1,83 +1,83 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Navbar from '../../components/Navbar'
 
-export default function ProgressTracker({ profile }) {
+export default function ProgressTracker() {
   const [checkins, setCheckins] = useState([])
-  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase
-      .from('wellness_checkins')
-      .select('*')
-      .eq('patient_id', profile.id)
-      .order('created_at', { ascending: true })
-      .limit(30)
-      .then(({ data }) => setCheckins(data || []))
-  }, [profile.id])
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = await supabase.from('wellness_checkins').select('*')
+        .eq('patient_id', user.id).order('created_at', { ascending: false }).limit(30)
+      setCheckins(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
 
-  const avg = (arr, key) => arr.length ? (arr.reduce((s, i) => s + (i[key] || 0), 0) / arr.length).toFixed(1) : '—'
+  const avg = (key) => checkins.length ? (checkins.reduce((s, c) => s + (c[key] || 0), 0) / checkins.length).toFixed(1) : '—'
 
   return (
-    <div className="min-h-screen">
-      <Navbar profile={profile} />
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate('/patient')} className="text-white/40 hover:text-white">←</button>
-          <h1 className="font-display text-3xl text-white">Tu Progreso</h1>
+    <div className="min-h-screen bg-navy">
+      <Navbar role="patient" />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="font-display text-3xl text-white font-light">Mi <span className="text-teal">progreso</span></h1>
+          <p className="text-white/40 mt-1 text-sm">Historial de los últimos 30 días</p>
         </div>
 
-        {checkins.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-white/40">Sin datos todavía.</p>
-            <p className="text-white/30 text-xs mt-2">Completa tu primer check-in diario.</p>
-            <button onClick={() => navigate('/patient/checkin')} className="btn-primary mt-4 text-sm">Hacer Check-in</button>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              {[
-                { label: 'Energía Prom.', val: avg(checkins, 'energy_level'), color: 'text-teal' },
-                { label: 'Sueño Prom.', val: avg(checkins, 'sleep_quality'), color: 'text-gold' },
-                { label: 'Bienestar Prom.', val: avg(checkins, 'overall_feeling'), color: 'text-white' },
-              ].map(s => (
-                <div key={s.label} className="card text-center">
-                  <div className={`font-display text-3xl font-bold ${s.color}`}>{s.val}</div>
-                  <div className="text-white/40 text-xs mt-1">{s.label}</div>
+        {/* Averages */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Energía', key: 'energy' },
+            { label: 'Ánimo', key: 'mood' },
+            { label: 'Sueño', key: 'sleep' },
+            { label: 'Recuperación', key: 'recovery' },
+          ].map(m => (
+            <div key={m.key} className="card text-center">
+              <p className="font-display text-3xl text-teal">{avg(m.key)}</p>
+              <p className="text-white/40 text-xs uppercase tracking-wide mt-1">{m.label}</p>
+              <p className="text-white/20 text-xs mt-0.5">promedio</p>
+            </div>
+          ))}
+        </div>
+
+        {/* History list */}
+        <div className="card">
+          <h2 className="font-display text-xl text-white mb-4">Historial de check-ins</h2>
+          {loading ? (
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-teal border-t-transparent rounded-full animate-spin" /></div>
+          ) : checkins.length === 0 ? (
+            <p className="text-white/30 text-sm text-center py-8">No hay check-ins aún. ¡Completa tu primero hoy!</p>
+          ) : (
+            <div className="space-y-2">
+              {checkins.map(c => (
+                <div key={c.id} className="p-4 rounded-xl border border-white/5 bg-navy">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-white/60 text-xs">
+                      {new Date(c.created_at).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['energy','mood','sleep','recovery'].map(k => (
+                      <div key={k} className="text-center">
+                        <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden mb-1">
+                          <div className="absolute left-0 top-0 h-full bg-teal rounded-full transition-all"
+                            style={{ width: `${(c[k] || 0) * 10}%` }} />
+                        </div>
+                        <p className="text-teal text-xs font-medium">{c[k]}/10</p>
+                        <p className="text-white/30 text-xs capitalize">{k === 'energy' ? 'Energía' : k === 'mood' ? 'Ánimo' : k === 'sleep' ? 'Sueño' : 'Recup.'}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {c.notes && <p className="text-white/40 text-xs mt-3 border-t border-white/5 pt-3">{c.notes}</p>}
                 </div>
               ))}
             </div>
-
-            <h2 className="font-display text-xl text-white mb-4">Últimos 30 días</h2>
-            <div className="card">
-              <div className="space-y-2">
-                {[...checkins].reverse().map(c => (
-                  <div key={c.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
-                    <span className="text-white/40 text-xs w-20">{new Date(c.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</span>
-                    <div className="flex gap-2 flex-1">
-                      {[
-                        { val: c.energy_level, color: 'bg-teal' },
-                        { val: c.sleep_quality, color: 'bg-gold' },
-                        { val: c.overall_feeling, color: 'bg-white/40' },
-                      ].map((bar, i) => (
-                        <div key={i} className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                          <div className={`h-full ${bar.color} rounded-full`} style={{ width: `${(bar.val || 0) * 10}%` }} />
-                        </div>
-                      ))}
-                    </div>
-                    {c.notes && <span className="text-white/20 text-xs truncate max-w-[80px]">{c.notes}</span>}
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-4 mt-4 text-xs text-white/30">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal inline-block" /> Energía</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gold inline-block" /> Sueño</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white/40 inline-block" /> Bienestar</span>
-              </div>
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

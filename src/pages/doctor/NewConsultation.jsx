@@ -2,127 +2,149 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Navbar from '../../components/Navbar'
-import ProtocolBuilder from '../../components/ProtocolBuilder'
 
-export default function NewConsultation({ profile }) {
+const PEPTIDES = ['BPC-157', 'TB-500', 'CJC-1295', 'Ipamorelin', 'GHK-Cu', 'Semax', 'Selank', 'PT-141', 'Tirzepatide', 'Semaglutida', 'AOD-9604', 'Hexarelin', 'GHRP-6', 'GHRP-2', 'Tesamorelin']
+
+const GOALS = ['Pérdida de peso', 'Ganancia muscular', 'Recuperación', 'Anti-envejecimiento', 'Energía y rendimiento', 'Salud hormonal', 'Salud cognitiva', 'Bienestar general']
+
+export default function NewConsultation() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
-  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     patient_email: '',
-    chief_complaint: '',
-    goals: '',
-    health_history: '',
-    current_meds: '',
-    peptide_protocol: [],
+    goals: [],
+    weight: '',
+    age: '',
     notes: '',
-    follow_up_date: '',
-    photos: [],
+    peptides: [],
+    dosage_notes: '',
+    cycle_weeks: '12',
   })
 
-  function set(field, val) { setForm(f => ({ ...f, [field]: val })) }
+  const toggleGoal = (g) => setForm(f => ({
+    ...f, goals: f.goals.includes(g) ? f.goals.filter(x => x !== g) : [...f.goals, g]
+  }))
 
-  async function handleSubmit() {
-    setSaving(true)
-    // Find patient by email
-    const { data: patient } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', form.patient_email)
-      .single()
+  const togglePeptide = (p) => setForm(f => ({
+    ...f, peptides: f.peptides.includes(p) ? f.peptides.filter(x => x !== p) : [...f.peptides, p]
+  }))
 
-    const payload = {
-      doctor_id: profile.id,
-      patient_id: patient?.id || null,
-      patient_email: form.patient_email,
-      chief_complaint: form.chief_complaint,
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Find or look up patient by email
+    const { data: patient } = await supabase.from('profiles').select('id').eq('email', form.patient_email).single()
+    if (!patient) { setError('No se encontró un paciente con ese correo.'); setLoading(false); return }
+
+    const { error: err } = await supabase.from('consultations').insert({
+      doctor_id: user.id,
+      patient_id: patient.id,
       goals: form.goals,
-      health_history: form.health_history,
-      current_meds: form.current_meds,
-      peptide_protocol: form.peptide_protocol,
+      weight: parseFloat(form.weight),
+      age: parseInt(form.age),
       notes: form.notes,
-      follow_up_date: form.follow_up_date || null,
+      protocol: { peptides: form.peptides, dosage_notes: form.dosage_notes, cycle_weeks: form.cycle_weeks },
       status: 'active',
-    }
-
-    const { error } = await supabase.from('consultations').insert(payload)
-    setSaving(false)
-    if (!error) navigate('/doctor')
+    })
+    if (err) { setError(err.message); setLoading(false); return }
+    navigate('/doctor')
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar profile={profile} />
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate('/doctor')} className="text-white/40 hover:text-white">←</button>
-          <h1 className="font-display text-3xl text-white">Nueva Consulta</h1>
+    <div className="min-h-screen bg-navy">
+      <Navbar role="doctor" />
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="font-display text-3xl text-white font-light">Nueva <span className="text-teal">Consulta</span></h1>
+          <p className="text-white/40 mt-1 text-sm">Completa el protocolo para el paciente</p>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex gap-2 mb-8">
-          {[1, 2, 3].map(s => (
-            <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${step >= s ? 'bg-teal' : 'bg-white/10'}`} />
-          ))}
-        </div>
-
-        {step === 1 && (
-          <div className="card space-y-4">
-            <h2 className="font-display text-xl text-gold">Datos del Paciente</h2>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Email del paciente</label>
-              <input value={form.patient_email} onChange={e => set('patient_email', e.target.value)} type="email" className="input-field" placeholder="paciente@email.com" />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Motivo de consulta</label>
-              <textarea value={form.chief_complaint} onChange={e => set('chief_complaint', e.target.value)} className="input-field h-24 resize-none" placeholder="Describe el motivo principal..." />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Objetivos del paciente</label>
-              <textarea value={form.goals} onChange={e => set('goals', e.target.value)} className="input-field h-24 resize-none" placeholder="Pérdida de peso, recuperación, anti-aging..." />
-            </div>
-            <button onClick={() => setStep(2)} className="w-full btn-primary">Siguiente →</button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="card space-y-4">
-            <h2 className="font-display text-xl text-gold">Historial Médico</h2>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Historial de salud</label>
-              <textarea value={form.health_history} onChange={e => set('health_history', e.target.value)} className="input-field h-28 resize-none" placeholder="Condiciones previas, cirugías, alergias..." />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Medicamentos actuales</label>
-              <textarea value={form.current_meds} onChange={e => set('current_meds', e.target.value)} className="input-field h-20 resize-none" placeholder="Lista de medicamentos o suplementos actuales..." />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="flex-1 btn-secondary">← Atrás</button>
-              <button onClick={() => setStep(3)} className="flex-1 btn-primary">Siguiente →</button>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Patient info */}
+          <div className="card">
+            <h2 className="font-display text-lg text-white mb-4">Datos del paciente</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-white/60 text-xs uppercase tracking-wide mb-1.5">Correo del paciente</label>
+                <input type="email" className="input-field" placeholder="paciente@ejemplo.com"
+                  value={form.patient_email} onChange={e => setForm({ ...form, patient_email: e.target.value })} required />
+              </div>
+              <div>
+                <label className="block text-white/60 text-xs uppercase tracking-wide mb-1.5">Edad</label>
+                <input type="number" className="input-field" placeholder="35"
+                  value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} required />
+              </div>
+              <div>
+                <label className="block text-white/60 text-xs uppercase tracking-wide mb-1.5">Peso (kg)</label>
+                <input type="number" className="input-field" placeholder="75"
+                  value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} required />
+              </div>
+              <div>
+                <label className="block text-white/60 text-xs uppercase tracking-wide mb-1.5">Ciclo (semanas)</label>
+                <select className="input-field" value={form.cycle_weeks} onChange={e => setForm({ ...form, cycle_weeks: e.target.value })}>
+                  {['4','8','12','16','24'].map(w => <option key={w} value={w}>{w} semanas</option>)}
+                </select>
+              </div>
             </div>
           </div>
-        )}
 
-        {step === 3 && (
-          <div className="card space-y-4">
-            <h2 className="font-display text-xl text-gold">Protocolo de Péptidos</h2>
-            <ProtocolBuilder value={form.peptide_protocol} onChange={val => set('peptide_protocol', val)} />
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Notas adicionales</label>
-              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className="input-field h-20 resize-none" placeholder="Instrucciones especiales, observaciones..." />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1 block">Fecha de seguimiento</label>
-              <input value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} type="date" className="input-field" />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 btn-secondary">← Atrás</button>
-              <button onClick={handleSubmit} disabled={saving} className="flex-1 btn-primary">
-                {saving ? 'Guardando...' : '✓ Guardar Consulta'}
-              </button>
+          {/* Goals */}
+          <div className="card">
+            <h2 className="font-display text-lg text-white mb-4">Objetivos del paciente</h2>
+            <div className="flex flex-wrap gap-2">
+              {GOALS.map(g => (
+                <button key={g} type="button" onClick={() => toggleGoal(g)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-all duration-200 ${
+                    form.goals.includes(g) ? 'bg-teal/20 border-teal text-teal' : 'border-white/10 text-white/40 hover:border-white/30'
+                  }`}>
+                  {g}
+                </button>
+              ))}
             </div>
           </div>
-        )}
+
+          {/* Protocol */}
+          <div className="card">
+            <h2 className="font-display text-lg text-white mb-4">Protocolo de péptidos</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {PEPTIDES.map(p => (
+                <button key={p} type="button" onClick={() => togglePeptide(p)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-all duration-200 ${
+                    form.peptides.includes(p) ? 'bg-gold/20 border-gold text-gold' : 'border-white/10 text-white/40 hover:border-white/30'
+                  }`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="block text-white/60 text-xs uppercase tracking-wide mb-1.5">Notas de dosificación</label>
+              <textarea className="input-field h-24 resize-none" placeholder="Ej: BPC-157 500mcg AM subcutáneo, 5 días ON / 2 días OFF..."
+                value={form.dosage_notes} onChange={e => setForm({ ...form, dosage_notes: e.target.value })} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="card">
+            <h2 className="font-display text-lg text-white mb-4">Notas clínicas</h2>
+            <textarea className="input-field h-32 resize-none" placeholder="Observaciones, condiciones previas, indicaciones especiales..."
+              value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+          </div>
+
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+
+          <div className="flex gap-3">
+            <button type="button" onClick={() => navigate('/doctor')} className="btn-outline flex-1">
+              Cancelar
+            </button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1 disabled:opacity-50">
+              {loading ? 'Guardando...' : 'Guardar consulta'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

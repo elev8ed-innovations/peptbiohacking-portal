@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import AgeGateModal from './components/AgeGateModal'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import DoctorDashboard from './pages/doctor/Dashboard'
@@ -12,73 +11,55 @@ import ProgressTracker from './pages/patient/ProgressTracker'
 import WellnessCheckin from './pages/patient/WellnessCheckin'
 import Chat from './pages/patient/Chat'
 
-export default function App() {
-  const [session, setSession] = useState(null)
+function ProtectedRoute({ children, allowedRole }) {
+  const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [ageGateCleared, setAgeGateCleared] = useState(
-    () => localStorage.getItem('pb_age_cleared') === 'true'
-  )
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) fetchProfile(session.user.id)
-      else setLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setSession(session)
       if (session) fetchProfile(session.user.id)
-      else { setProfile(null); setLoading(false) }
+      else setProfile(null)
     })
     return () => subscription.unsubscribe()
   }, [])
 
-  async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
     setProfile(data)
-    setLoading(false)
   }
 
-  function handleAgeConfirm() {
-    localStorage.setItem('pb_age_cleared', 'true')
-    setAgeGateCleared(true)
-  }
-
-  if (!ageGateCleared) return <AgeGateModal onConfirm={handleAgeConfirm} />
-  if (loading) return (
+  if (session === undefined) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full animate-spin" />
     </div>
   )
-
-  if (!session) {
-    return (
-      <Routes>
-        <Route path="/register" element={<Register />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
-    )
+  if (!session) return <Navigate to="/login" replace />
+  if (allowedRole && profile && profile.role !== allowedRole) {
+    return <Navigate to={profile.role === 'doctor' ? '/doctor' : '/patient'} replace />
   }
+  return children
+}
 
-  if (profile?.role === 'doctor') {
-    return (
-      <Routes>
-        <Route path="/doctor" element={<DoctorDashboard profile={profile} />} />
-        <Route path="/doctor/consulta/nueva" element={<NewConsultation profile={profile} />} />
-        <Route path="/doctor/paciente/:id" element={<PatientDetail profile={profile} />} />
-        <Route path="*" element={<Navigate to="/doctor" />} />
-      </Routes>
-    )
-  }
-
+export default function App() {
   return (
-    <Routes>
-      <Route path="/patient" element={<PatientDashboard profile={profile} />} />
-      <Route path="/patient/progreso" element={<ProgressTracker profile={profile} />} />
-      <Route path="/patient/checkin" element={<WellnessCheckin profile={profile} />} />
-      <Route path="/patient/chat" element={<Chat profile={profile} />} />
-      <Route path="*" element={<Navigate to="/patient" />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/doctor" element={<ProtectedRoute allowedRole="doctor"><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/consulta/nueva" element={<ProtectedRoute allowedRole="doctor"><NewConsultation /></ProtectedRoute>} />
+        <Route path="/doctor/paciente/:id" element={<ProtectedRoute allowedRole="doctor"><PatientDetail /></ProtectedRoute>} />
+        <Route path="/patient" element={<ProtectedRoute allowedRole="patient"><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/patient/progreso" element={<ProtectedRoute allowedRole="patient"><ProgressTracker /></ProtectedRoute>} />
+        <Route path="/patient/checkin" element={<ProtectedRoute allowedRole="patient"><WellnessCheckin /></ProtectedRoute>} />
+        <Route path="/patient/chat" element={<ProtectedRoute allowedRole="patient"><Chat /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
