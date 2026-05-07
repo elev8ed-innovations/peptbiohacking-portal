@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
 
+const Wordmark = ({ size = 28 }) => (
+  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: size, fontWeight: 700, letterSpacing: '2px' }}>
+    <span style={{ color: '#ffffff' }}>PEPT</span>
+    <span style={{ color: '#00C2A8' }}>BIO</span>
+    <span style={{ color: '#ffffff' }}>HACKING</span>
+  </span>
+)
+
 export default function Login() {
   const navigate = useNavigate()
   const { t, lang, toggleLang } = useLang()
@@ -16,10 +24,6 @@ export default function Login() {
   const [role, setRole] = useState('patient')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const handleGate = () => {
-    if (ageCheck && waiverCheck) setGateCleared(true)
-  }
 
   const handleAuth = async () => {
     setLoading(true)
@@ -35,35 +39,13 @@ export default function Login() {
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
         navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
       }
     } catch (e) {
       setError(e.message)
     }
     setLoading(false)
-  }
-
-  const inputStyle = {
-    width: '100%', padding: '12px 16px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(0,194,168,0.2)',
-    borderRadius: '8px', color: '#fff',
-    fontFamily: 'Outfit, sans-serif', fontSize: '14px',
-    outline: 'none', boxSizing: 'border-box',
-  }
-
-  const btnStyle = {
-    width: '100%', padding: '13px',
-    background: 'linear-gradient(135deg, #00C2A8, #00A891)',
-    border: 'none', borderRadius: '8px',
-    color: '#0A1628', fontFamily: 'Outfit, sans-serif',
-    fontSize: '15px', fontWeight: 700, cursor: 'pointer',
-    marginTop: '8px',
   }
 
   const pageStyle = {
@@ -74,54 +56,57 @@ export default function Login() {
   }
 
   const cardStyle = {
-    background: 'rgba(13,31,60,0.9)',
-    border: '1px solid rgba(0,194,168,0.2)',
-    borderRadius: '16px', padding: '40px',
-    width: '100%', maxWidth: '420px',
+    background: 'rgba(13,31,60,0.9)', border: '1px solid rgba(0,194,168,0.2)',
+    borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px',
     backdropFilter: 'blur(20px)',
   }
+
+  const inputStyle = {
+    width: '100%', padding: '12px 16px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,194,168,0.2)',
+    borderRadius: '8px', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '14px',
+    outline: 'none', boxSizing: 'border-box',
+  }
+
+  const btnStyle = {
+    width: '100%', padding: '13px',
+    background: 'linear-gradient(135deg, #00C2A8, #00A891)',
+    border: 'none', borderRadius: '8px', color: '#0A1628',
+    fontFamily: 'Outfit, sans-serif', fontSize: '15px', fontWeight: 700, cursor: 'pointer', marginTop: '8px',
+  }
+
+  const langBtn = (
+    <button onClick={toggleLang} style={{
+      position: 'absolute', top: '20px', right: '20px',
+      background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
+      color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
+      fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+    }}>{lang === 'es' ? 'EN' : 'ES'}</button>
+  )
 
   if (!gateCleared) {
     return (
       <div style={pageStyle}>
-        <button onClick={toggleLang} style={{
-          position: 'absolute', top: '20px', right: '20px',
-          background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
-          color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
-          fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-        }}>{lang === 'es' ? 'EN' : 'ES'}</button>
-
+        {langBtn}
         <div style={cardStyle}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{
-              width: '56px', height: '56px', borderRadius: '12px',
-              background: 'linear-gradient(135deg, #00C2A8, #C9A84C)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px', fontSize: '28px', color: '#0A1628', fontWeight: 700,
-              fontFamily: 'Cormorant Garamond, serif'
-            }}>P</div>
-            <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '26px', color: '#fff', margin: 0 }}>
-              {t.gateTitle}
-            </h1>
-            <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', margin: '12px auto 0' }} />
+            <Wordmark size={26} />
+            <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', margin: '14px auto 0' }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {[
-              { key: 'age', checked: ageCheck, set: setAgeCheck, label: t.gateAge },
-              { key: 'waiver', checked: waiverCheck, set: setWaiverCheck, label: t.gateWaiver },
-            ].map(item => (
-              <label key={item.key} style={{ display: 'flex', gap: '12px', cursor: 'pointer', alignItems: 'flex-start' }}>
-                <div
-                  onClick={() => item.set(!item.checked)}
-                  style={{
-                    width: '20px', height: '20px', minWidth: '20px', borderRadius: '4px',
-                    border: '2px solid rgba(0,194,168,0.5)',
-                    background: item.checked ? '#00C2A8' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginTop: '2px', transition: 'all 0.2s',
-                  }}
-                >
+              { checked: ageCheck, set: setAgeCheck, label: t.gateAge },
+              { checked: waiverCheck, set: setWaiverCheck, label: t.gateWaiver },
+            ].map((item, i) => (
+              <label key={i} style={{ display: 'flex', gap: '12px', cursor: 'pointer', alignItems: 'flex-start' }}>
+                <div onClick={() => item.set(!item.checked)} style={{
+                  width: '20px', height: '20px', minWidth: '20px', borderRadius: '4px',
+                  border: '2px solid rgba(0,194,168,0.5)',
+                  background: item.checked ? '#00C2A8' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginTop: '2px', transition: 'all 0.2s',
+                }}>
                   {item.checked && <span style={{ color: '#0A1628', fontSize: '13px', fontWeight: 700 }}>✓</span>}
                 </div>
                 <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: '13px', color: 'rgba(255,255,255,0.75)', lineHeight: '1.5' }}>
@@ -132,14 +117,9 @@ export default function Login() {
           </div>
 
           <button
-            onClick={handleGate}
+            onClick={() => { if (ageCheck && waiverCheck) setGateCleared(true) }}
             disabled={!ageCheck || !waiverCheck}
-            style={{
-              ...btnStyle,
-              marginTop: '24px',
-              opacity: (!ageCheck || !waiverCheck) ? 0.4 : 1,
-              cursor: (!ageCheck || !waiverCheck) ? 'not-allowed' : 'pointer',
-            }}
+            style={{ ...btnStyle, marginTop: '24px', opacity: (!ageCheck || !waiverCheck) ? 0.4 : 1, cursor: (!ageCheck || !waiverCheck) ? 'not-allowed' : 'pointer' }}
           >{t.gateContinue}</button>
         </div>
       </div>
@@ -148,47 +128,21 @@ export default function Login() {
 
   return (
     <div style={pageStyle}>
-      <button onClick={toggleLang} style={{
-        position: 'absolute', top: '20px', right: '20px',
-        background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
-        color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
-        fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-      }}>{lang === 'es' ? 'EN' : 'ES'}</button>
-
+      {langBtn}
       <div style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{
-            width: '48px', height: '48px', borderRadius: '10px',
-            background: 'linear-gradient(135deg, #00C2A8, #C9A84C)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 12px', fontSize: '24px', color: '#0A1628', fontWeight: 700,
-            fontFamily: 'Cormorant Garamond, serif'
-          }}>P</div>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '24px', color: '#fff', margin: 0 }}>
-            {isRegister ? t.register : t.login}
-          </h2>
+          <Wordmark size={24} />
+          <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', margin: '12px auto 0' }} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {isRegister && (
-            <input
-              style={inputStyle} placeholder={t.fullName}
-              value={fullName} onChange={e => setFullName(e.target.value)}
-            />
+            <input style={inputStyle} placeholder={t.fullName} value={fullName} onChange={e => setFullName(e.target.value)} />
           )}
-          <input
-            style={inputStyle} placeholder={t.email} type="email"
-            value={email} onChange={e => setEmail(e.target.value)}
-          />
-          <input
-            style={inputStyle} placeholder={t.password} type="password"
-            value={password} onChange={e => setPassword(e.target.value)}
-          />
+          <input style={inputStyle} placeholder={t.email} type="email" value={email} onChange={e => setEmail(e.target.value)} />
+          <input style={inputStyle} placeholder={t.password} type="password" value={password} onChange={e => setPassword(e.target.value)} />
           {isRegister && (
-            <select
-              style={{ ...inputStyle, cursor: 'pointer' }}
-              value={role} onChange={e => setRole(e.target.value)}
-            >
+            <select style={{ ...inputStyle, cursor: 'pointer' }} value={role} onChange={e => setRole(e.target.value)}>
               <option value="patient">{t.patient}</option>
               <option value="doctor">{t.doctor}</option>
             </select>
@@ -202,10 +156,7 @@ export default function Login() {
         </button>
 
         <p style={{ textAlign: 'center', marginTop: '16px', fontFamily: 'Outfit, sans-serif', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>
-          <span
-            onClick={() => setIsRegister(!isRegister)}
-            style={{ color: '#00C2A8', cursor: 'pointer' }}
-          >
+          <span onClick={() => setIsRegister(!isRegister)} style={{ color: '#00C2A8', cursor: 'pointer' }}>
             {isRegister ? t.login : t.register}
           </span>
         </p>
