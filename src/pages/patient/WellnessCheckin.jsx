@@ -1,96 +1,77 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import { useState, useEffect } from 'react'
 import Navbar from '../../components/Navbar'
-
-const metrics = [
-  { key: 'energy', label: 'Energía', desc: '¿Cómo estuvo tu nivel de energía hoy?' },
-  { key: 'mood', label: 'Ánimo', desc: '¿Cómo estuvo tu estado de ánimo?' },
-  { key: 'sleep', label: 'Sueño', desc: '¿Cómo dormiste anoche?' },
-  { key: 'recovery', label: 'Recuperación', desc: '¿Cómo se siente tu cuerpo físicamente?' },
-]
-
-function Slider({ label, desc, value, onChange }) {
-  return (
-    <div className="p-5 rounded-xl border border-white/10 bg-navy">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-white font-medium text-sm">{label}</p>
-          <p className="text-white/40 text-xs mt-0.5">{desc}</p>
-        </div>
-        <span className="font-display text-2xl text-teal">{value}</span>
-      </div>
-      <input type="range" min={1} max={10} value={value}
-        onChange={e => onChange(parseInt(e.target.value))}
-        className="w-full accent-teal cursor-pointer" />
-      <div className="flex justify-between text-white/20 text-xs mt-1">
-        <span>Muy bajo</span><span>Excelente</span>
-      </div>
-    </div>
-  )
-}
+import { supabase } from '../../lib/supabase'
+import { useLang } from '../../context/LanguageContext'
 
 export default function WellnessCheckin() {
-  const navigate = useNavigate()
-  const [values, setValues] = useState({ energy: 7, mood: 7, sleep: 7, recovery: 7 })
+  const { t } = useLang()
+  const [score, setScore] = useState(7)
   const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  const save = async () => {
+    setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('wellness_checkins').insert({
       patient_id: user.id,
-      ...values,
+      wellness_score: score,
       notes,
     })
-    setDone(true)
-    setLoading(false)
+    setSaved(true)
+    setNotes('')
+    setTimeout(() => setSaved(false), 2000)
+    setSaving(false)
   }
 
-  if (done) return (
-    <div className="min-h-screen bg-navy">
-      <Navbar role="patient" />
-      <div className="max-w-md mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 bg-teal/10 border border-teal/30 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <h2 className="font-display text-2xl text-white mb-2">¡Check-in registrado!</h2>
-        <p className="text-white/40 text-sm mb-6">Tu reporte fue enviado al Dr. Valenzuela.</p>
-        <button onClick={() => navigate('/patient')} className="btn-primary">Volver al portal</button>
-      </div>
-    </div>
-  )
+  const emojis = ['😔', '😟', '😐', '🙂', '😊', '😄', '🤩']
+  const emojiIndex = Math.min(Math.floor((score - 1) / 1.5), emojis.length - 1)
 
   return (
-    <div className="min-h-screen bg-navy">
+    <div style={{ minHeight: '100vh', background: '#0A1628' }}>
       <Navbar role="patient" />
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="font-display text-3xl text-white font-light">Check-in <span className="text-teal">diario</span></h1>
-          <p className="text-white/40 mt-1 text-sm">{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-        </div>
+      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '32px 20px' }}>
+        <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '32px', color: '#fff', margin: '0 0 8px' }}>
+          {t.checkin}
+        </h1>
+        <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', marginBottom: '32px' }} />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {metrics.map(m => (
-            <Slider key={m.key} label={m.label} desc={m.desc} value={values[m.key]}
-              onChange={v => setValues({ ...values, [m.key]: v })} />
-          ))}
-
-          <div className="card">
-            <label className="block text-white/60 text-xs uppercase tracking-wide mb-2">Notas adicionales (opcional)</label>
-            <textarea className="input-field h-24 resize-none" placeholder="¿Algún síntoma, efecto o comentario para el doctor?"
-              value={notes} onChange={e => setNotes(e.target.value)} />
+        <div style={{ background: 'rgba(13,31,60,0.8)', border: '1px solid rgba(0,194,168,0.15)', borderRadius: '16px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          {/* Score */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '64px', marginBottom: '12px' }}>{emojis[emojiIndex]}</div>
+            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '48px', color: '#00C2A8', fontWeight: 700 }}>{score}</div>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Outfit, sans-serif', fontSize: '14px', marginBottom: '16px' }}>/ 10</div>
+            <input
+              type="range" min="1" max="10" value={score}
+              onChange={e => setScore(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#00C2A8', height: '6px' }}
+            />
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
-            {loading ? 'Enviando...' : 'Enviar check-in'}
-          </button>
-        </form>
+          {/* Notes */}
+          <div>
+            <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontFamily: 'Outfit, sans-serif', fontSize: '14px', marginBottom: '8px' }}>
+              {t.notes}
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={4}
+              placeholder={t.messagePlaceholder}
+              style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,194,168,0.2)', borderRadius: '8px', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '14px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <button
+            onClick={save} disabled={saving}
+            style={{
+              padding: '14px', background: saved ? 'rgba(0,194,168,0.2)' : 'linear-gradient(135deg, #00C2A8, #00A891)',
+              border: saved ? '1px solid #00C2A8' : 'none', borderRadius: '10px',
+              color: '#0A1628', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
+            }}
+          >{saved ? `✓ ${t.saved}` : t.save}</button>
+        </div>
       </div>
     </div>
   )

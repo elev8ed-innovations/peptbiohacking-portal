@@ -1,184 +1,213 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useLang } from '../context/LanguageContext'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [step, setStep] = useState('gate') // gate | login
-  const [ageConfirmed, setAgeConfirmed] = useState(false)
-  const [waiverAccepted, setWaiverAccepted] = useState(false)
+  const { t, lang, toggleLang } = useLang()
+  const [gateCleared, setGateCleared] = useState(false)
+  const [ageCheck, setAgeCheck] = useState(false)
+  const [waiverCheck, setWaiverCheck] = useState(false)
+  const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [role, setRole] = useState('patient')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleGateContinue = () => {
-    if (!ageConfirmed || !waiverAccepted) {
-      setError('Debes confirmar ambas opciones para continuar.')
-      return
-    }
-    setError('')
-    setStep('login')
+  const handleGate = () => {
+    if (ageCheck && waiverCheck) setGateCleared(true)
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  const handleAuth = async () => {
     setLoading(true)
     setError('')
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-    navigate(profile?.role === 'doctor' ? '/doctor' : '/patient')
+    try {
+      if (isRegister) {
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName, role } }
+        })
+        if (error) throw error
+        navigate(role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single()
+        navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
+      }
+    } catch (e) {
+      setError(e.message)
+    }
+    setLoading(false)
+  }
+
+  const inputStyle = {
+    width: '100%', padding: '12px 16px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(0,194,168,0.2)',
+    borderRadius: '8px', color: '#fff',
+    fontFamily: 'Outfit, sans-serif', fontSize: '14px',
+    outline: 'none', boxSizing: 'border-box',
+  }
+
+  const btnStyle = {
+    width: '100%', padding: '13px',
+    background: 'linear-gradient(135deg, #00C2A8, #00A891)',
+    border: 'none', borderRadius: '8px',
+    color: '#0A1628', fontFamily: 'Outfit, sans-serif',
+    fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+    marginTop: '8px',
+  }
+
+  const pageStyle = {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #0A1628 0%, #0D1F3C 60%, #0A1628 100%)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '20px', position: 'relative',
+  }
+
+  const cardStyle = {
+    background: 'rgba(13,31,60,0.9)',
+    border: '1px solid rgba(0,194,168,0.2)',
+    borderRadius: '16px', padding: '40px',
+    width: '100%', maxWidth: '420px',
+    backdropFilter: 'blur(20px)',
+  }
+
+  if (!gateCleared) {
+    return (
+      <div style={pageStyle}>
+        <button onClick={toggleLang} style={{
+          position: 'absolute', top: '20px', right: '20px',
+          background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
+          color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
+          fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+        }}>{lang === 'es' ? 'EN' : 'ES'}</button>
+
+        <div style={cardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '12px',
+              background: 'linear-gradient(135deg, #00C2A8, #C9A84C)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px', fontSize: '28px', color: '#0A1628', fontWeight: 700,
+              fontFamily: 'Cormorant Garamond, serif'
+            }}>P</div>
+            <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '26px', color: '#fff', margin: 0 }}>
+              {t.gateTitle}
+            </h1>
+            <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', margin: '12px auto 0' }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[
+              { key: 'age', checked: ageCheck, set: setAgeCheck, label: t.gateAge },
+              { key: 'waiver', checked: waiverCheck, set: setWaiverCheck, label: t.gateWaiver },
+            ].map(item => (
+              <label key={item.key} style={{ display: 'flex', gap: '12px', cursor: 'pointer', alignItems: 'flex-start' }}>
+                <div
+                  onClick={() => item.set(!item.checked)}
+                  style={{
+                    width: '20px', height: '20px', minWidth: '20px', borderRadius: '4px',
+                    border: '2px solid rgba(0,194,168,0.5)',
+                    background: item.checked ? '#00C2A8' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginTop: '2px', transition: 'all 0.2s',
+                  }}
+                >
+                  {item.checked && <span style={{ color: '#0A1628', fontSize: '13px', fontWeight: 700 }}>✓</span>}
+                </div>
+                <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: '13px', color: 'rgba(255,255,255,0.75)', lineHeight: '1.5' }}>
+                  {item.label}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <button
+            onClick={handleGate}
+            disabled={!ageCheck || !waiverCheck}
+            style={{
+              ...btnStyle,
+              marginTop: '24px',
+              opacity: (!ageCheck || !waiverCheck) ? 0.4 : 1,
+              cursor: (!ageCheck || !waiverCheck) ? 'not-allowed' : 'pointer',
+            }}
+          >{t.gateContinue}</button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-navy" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full opacity-10"
-        style={{ background: 'radial-gradient(circle, #00C2A8 0%, transparent 70%)' }} />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full opacity-5"
-        style={{ background: 'radial-gradient(circle, #C9A84C 0%, transparent 70%)' }} />
+    <div style={pageStyle}>
+      <button onClick={toggleLang} style={{
+        position: 'absolute', top: '20px', right: '20px',
+        background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
+        color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
+        fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+      }}>{lang === 'es' ? 'EN' : 'ES'}</button>
 
-      {/* Logo */}
-      <div className="relative z-10 text-center mb-8">
-        <h1 className="font-display text-4xl font-light tracking-widest text-white">
-          PEPT<span className="text-teal">BIO</span>HACKING
-        </h1>
-        <p className="text-white/40 text-sm tracking-wider mt-1 font-body">PORTAL MÉDICO</p>
-        <div className="w-16 h-px bg-gold mx-auto mt-3" />
-      </div>
+      <div style={cardStyle}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{
+            width: '48px', height: '48px', borderRadius: '10px',
+            background: 'linear-gradient(135deg, #00C2A8, #C9A84C)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 12px', fontSize: '24px', color: '#0A1628', fontWeight: 700,
+            fontFamily: 'Cormorant Garamond, serif'
+          }}>P</div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '24px', color: '#fff', margin: 0 }}>
+            {isRegister ? t.register : t.login}
+          </h2>
+        </div>
 
-      {/* Card */}
-      <div className="relative z-10 w-full max-w-md">
-        <div className="bg-navy-light border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-
-          {/* STEP 1 — Combined Gate */}
-          {step === 'gate' && (
-            <div className="p-8">
-              <h2 className="font-display text-2xl font-medium text-white mb-1">Bienvenido</h2>
-              <p className="text-white/50 text-sm mb-6">Confirma los siguientes puntos para acceder</p>
-
-              <div className="space-y-4 mb-6">
-                {/* Age confirmation */}
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <div className="relative mt-0.5 flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={ageConfirmed}
-                      onChange={e => setAgeConfirmed(e.target.checked)}
-                    />
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200 ${ageConfirmed ? 'bg-teal border-teal' : 'border-white/30 group-hover:border-teal/50'}`}>
-                      {ageConfirmed && (
-                        <svg className="w-3 h-3 text-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">Confirmo que tengo 18 años o más</p>
-                    <p className="text-white/40 text-xs mt-0.5">Este portal contiene información médica para adultos</p>
-                  </div>
-                </label>
-
-                {/* Waiver */}
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <div className="relative mt-0.5 flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={waiverAccepted}
-                      onChange={e => setWaiverAccepted(e.target.checked)}
-                    />
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200 ${waiverAccepted ? 'bg-teal border-teal' : 'border-white/30 group-hover:border-teal/50'}`}>
-                      {waiverAccepted && (
-                        <svg className="w-3 h-3 text-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">Acepto el aviso médico COFEPRIS</p>
-                    <p className="text-white/40 text-xs mt-0.5">Los servicios ofrecidos son bajo supervisión médica. Los péptidos son para uso bajo prescripción. Cédula Prof. #4667632.</p>
-                  </div>
-                </label>
-              </div>
-
-              {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-
-              <button
-                onClick={handleGateContinue}
-                className="btn-primary font-body"
-              >
-                Continuar al acceso
-              </button>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {isRegister && (
+            <input
+              style={inputStyle} placeholder={t.fullName}
+              value={fullName} onChange={e => setFullName(e.target.value)}
+            />
           )}
-
-          {/* STEP 2 — Login form */}
-          {step === 'login' && (
-            <div className="p-8">
-              <button onClick={() => setStep('gate')} className="flex items-center gap-1 text-white/40 hover:text-white/70 text-sm mb-6 transition-colors">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-                Regresar
-              </button>
-
-              <h2 className="font-display text-2xl font-medium text-white mb-1">Iniciar sesión</h2>
-              <p className="text-white/50 text-sm mb-6">Ingresa tus credenciales de acceso</p>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-white/60 text-xs font-medium mb-1.5 tracking-wide uppercase">Correo electrónico</label>
-                  <input
-                    type="email"
-                    className="input-field font-body"
-                    placeholder="doctor@ejemplo.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-xs font-medium mb-1.5 tracking-wide uppercase">Contraseña</label>
-                  <input
-                    type="password"
-                    className="input-field font-body"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <button type="submit" disabled={loading} className="btn-primary font-body disabled:opacity-50">
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
-                      Entrando...
-                    </span>
-                  ) : 'Entrar al portal'}
-                </button>
-              </form>
-
-              <p className="text-center text-white/40 text-sm mt-6">
-                ¿No tienes cuenta?{' '}
-                <Link to="/register" className="text-teal hover:text-teal-dark transition-colors">
-                  Regístrate
-                </Link>
-              </p>
-            </div>
+          <input
+            style={inputStyle} placeholder={t.email} type="email"
+            value={email} onChange={e => setEmail(e.target.value)}
+          />
+          <input
+            style={inputStyle} placeholder={t.password} type="password"
+            value={password} onChange={e => setPassword(e.target.value)}
+          />
+          {isRegister && (
+            <select
+              style={{ ...inputStyle, cursor: 'pointer' }}
+              value={role} onChange={e => setRole(e.target.value)}
+            >
+              <option value="patient">{t.patient}</option>
+              <option value="doctor">{t.doctor}</option>
+            </select>
           )}
         </div>
 
-        <p className="text-center text-white/20 text-xs mt-6">
-          peptbiohacking.mx · Uso exclusivo para pacientes y médicos registrados
+        {error && <p style={{ color: '#ff6b6b', fontSize: '13px', fontFamily: 'Outfit, sans-serif', marginTop: '8px' }}>{error}</p>}
+
+        <button onClick={handleAuth} disabled={loading} style={{ ...btnStyle, opacity: loading ? 0.7 : 1 }}>
+          {loading ? '...' : (isRegister ? t.register : t.login)}
+        </button>
+
+        <p style={{ textAlign: 'center', marginTop: '16px', fontFamily: 'Outfit, sans-serif', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>
+          <span
+            onClick={() => setIsRegister(!isRegister)}
+            style={{ color: '#00C2A8', cursor: 'pointer' }}
+          >
+            {isRegister ? t.login : t.register}
+          </span>
         </p>
       </div>
     </div>
