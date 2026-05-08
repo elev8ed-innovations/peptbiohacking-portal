@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
 
 export default function IntroModal({ onDismiss }) {
   const { lang } = useLang()
+  const [checked, setChecked] = useState(false)
 
   const dismiss = async () => {
+    if (!checked) return
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       await supabase.from('profiles').update({ has_seen_intro: true }).eq('id', user.id)
@@ -52,9 +55,6 @@ export default function IntroModal({ onDismiss }) {
                 <li><strong>Tus check-ins de bienestar</strong> ayudan al Dr. V a personalizar tu atención con el tiempo</li>
                 <li><strong>Contácta al Dr. V</strong> a través del portal cuando tengas preguntas</li>
               </ul>
-              <p style={{ fontSize: '12px', color: '#2A2A2A', opacity: 0.5, marginBottom: '24px', borderTop: '1px solid #E5E5E5', paddingTop: '16px' }}>
-                Los resultados individuales pueden variar. Esta plataforma no sustituye el juicio clínico. La información aquí es exclusivamente de carácter educativo y de apoyo al tratamiento prescrito.
-              </p>
             </>
           ) : (
             <>
@@ -69,19 +69,40 @@ export default function IntroModal({ onDismiss }) {
                 <li><strong>Your wellness check-ins</strong> help Dr. V personalize your care over time</li>
                 <li><strong>Contact Dr. V</strong> through the portal anytime you have questions</li>
               </ul>
-              <p style={{ fontSize: '12px', color: '#2A2A2A', opacity: 0.5, marginBottom: '24px', borderTop: '1px solid #E5E5E5', paddingTop: '16px' }}>
-                Individual results may vary. This platform does not replace clinical judgment. Information here is exclusively educational and supportive of the prescribed treatment.
-              </p>
             </>
           )}
 
+          {/* Research Disclaimer Checkbox */}
+          <div style={{
+            background: '#FAF7F2', border: '1px solid #E5E5E5',
+            borderRadius: '10px', padding: '16px', marginBottom: '20px',
+          }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={e => setChecked(e.target.checked)}
+                style={{ marginTop: '2px', accentColor: '#00C2A8', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '12px', color: '#2A2A2A', lineHeight: 1.6 }}>
+                {lang === 'es'
+                  ? 'Entiendo que esta plataforma es para uso exclusivamente educativo e investigativo bajo supervisión médica. El contenido aquí presentado no constituye diagnóstico ni tratamiento médico independiente, y no reemplaza el juicio clínico del médico tratante.'
+                  : 'I understand that this platform is intended exclusively for educational and research purposes under physician supervision. The content presented herein does not constitute independent medical diagnosis or treatment, and does not replace the clinical judgment of the treating physician.'}
+              </span>
+            </label>
+          </div>
+
           <button
             onClick={dismiss}
+            disabled={!checked}
             style={{
               width: '100%', padding: '14px', minHeight: '44px',
-              background: '#0A1628', border: 'none', borderRadius: '10px',
-              color: '#fff', fontFamily: 'Outfit, sans-serif', fontWeight: 700,
-              fontSize: '15px', cursor: 'pointer',
+              background: checked ? '#0A1628' : '#E5E5E5',
+              border: 'none', borderRadius: '10px',
+              color: checked ? '#fff' : '#2A2A2A',
+              fontFamily: 'Outfit, sans-serif', fontWeight: 700,
+              fontSize: '15px', cursor: checked ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s ease',
             }}
           >
             {lang === 'es' ? 'Entendido — ¡comencemos!' : "I understand — let's begin"}
