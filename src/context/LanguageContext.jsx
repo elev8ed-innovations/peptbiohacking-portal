@@ -158,9 +158,21 @@ export const translations = {
 }
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState('es')
+  const [lang, setLang] = useState(() => {
+    // Read from localStorage on init — default to 'es'
+    return localStorage.getItem('pept_lang') || 'es'
+  })
+
   const t = translations[lang]
-  const toggleLang = () => setLang(l => l === 'es' ? 'en' : 'es')
+
+  const toggleLang = () => {
+    setLang(l => {
+      const next = l === 'es' ? 'en' : 'es'
+      localStorage.setItem('pept_lang', next)
+      return next
+    })
+  }
+
   return (
     <LanguageContext.Provider value={{ lang, t, toggleLang }}>
       {children}
