@@ -37,18 +37,12 @@ export default function PatientDashboard() {
         supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }).limit(3),
       ])
 
-      // Fallback chain: profile full_name → auth metadata full_name → auth metadata name → email prefix
-      const resolvedName =
-        prof?.full_name ||
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email?.split('@')[0]
-
-      setProfile({ ...(prof || {}), full_name: resolvedName })
+      setProfile(prof)
       setConsultations(consults || [])
       setCheckins(chks || [])
       setLoading(false)
 
+      // Show intro modal on first login
       if (prof && prof.has_seen_intro === false) setShowIntro(true)
     }
     load()
