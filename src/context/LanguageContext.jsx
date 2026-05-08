@@ -10,6 +10,8 @@ export const translations = {
     checkin: 'Check-in',
     messages: 'Messages',
     labs: 'Lab Results',
+    booking: 'Book Consult',
+    lightHealth: 'Light & Rhythm',
     logout: 'Logout',
     patients: 'Patients',
     newConsult: 'New Consultation',
@@ -34,6 +36,16 @@ export const translations = {
     recentCheckins: 'Recent Check-ins',
     noCheckins: 'No check-ins recorded yet.',
     wellnessScore: 'Wellness Score',
+    reorder: 'Reorder →',
+    // Booking
+    bookingTitle: 'Book a Consultation',
+    bookingSubtitle: 'Schedule your 15-minute initial consultation with Dr. Fernando Valenzuela. Available Monday–Thursday, 8–9 AM.',
+    // Light Health
+    lightHealthTitle: 'Light & Circadian Health',
+    lightHealthSubtitle: 'Optimize your body\'s natural rhythms to amplify your peptide protocol results.',
+    // Intro Modal
+    introTitle: 'Welcome to Your Peptide Journey',
+    introDismiss: 'I understand — let\'s begin',
     // Messages
     messagesTitle: 'Messages',
     messagePlaceholder: 'Type a message...',
@@ -47,6 +59,11 @@ export const translations = {
     uploading: 'Uploading...',
     // Doctor
     patientList: 'Patient List',
+    todayAppts: 'Today\'s Appointments',
+    noAppts: 'No appointments scheduled for today.',
+    viewIntake: 'View Intake',
+    joinMeet: 'Join Meet',
+    startConsult: 'Start Consultation',
     aiSummary: 'AI Summary',
     generating: 'Generating...',
     summaryTitle: 'Patient Summary',
@@ -69,6 +86,8 @@ export const translations = {
     checkin: 'Check-in',
     messages: 'Mensajes',
     labs: 'Estudios',
+    booking: 'Reservar Consulta',
+    lightHealth: 'Luz & Ritmo',
     logout: 'Salir',
     patients: 'Pacientes',
     newConsult: 'Nueva Consulta',
@@ -93,6 +112,16 @@ export const translations = {
     recentCheckins: 'Check-ins Recientes',
     noCheckins: 'Sin check-ins registrados aún.',
     wellnessScore: 'Puntaje de Bienestar',
+    reorder: 'Reordenar →',
+    // Booking
+    bookingTitle: 'Reservar una Consulta',
+    bookingSubtitle: 'Agenda tu consulta inicial de 15 minutos con el Dr. Fernando Valenzuela. Disponible lunes–jueves, 8–9 AM.',
+    // Light Health
+    lightHealthTitle: 'Salud de Luz y Ritmo Circadiano',
+    lightHealthSubtitle: 'Optimiza los ritmos naturales de tu cuerpo para amplificar los resultados de tu protocolo de péptidos.',
+    // Intro Modal
+    introTitle: 'Bienvenido a Tu Viaje de Péptidos',
+    introDismiss: 'Entendido — ¡comencemos!',
     // Messages
     messagesTitle: 'Mensajes',
     messagePlaceholder: 'Escribe un mensaje...',
@@ -106,6 +135,11 @@ export const translations = {
     uploading: 'Subiendo...',
     // Doctor
     patientList: 'Lista de Pacientes',
+    todayAppts: 'Consultas de Hoy',
+    noAppts: 'No hay consultas programadas para hoy.',
+    viewIntake: 'Ver Intake',
+    joinMeet: 'Unirse a Meet',
+    startConsult: 'Iniciar Consulta',
     aiSummary: 'Resumen IA',
     generating: 'Generando...',
     summaryTitle: 'Resumen del Paciente',

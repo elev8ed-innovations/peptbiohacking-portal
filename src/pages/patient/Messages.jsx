@@ -29,7 +29,6 @@ export default function Messages() {
     }
     load()
 
-    // Real-time subscription
     const channel = supabase
       .channel('messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -47,51 +46,45 @@ export default function Messages() {
   const sendMessage = async () => {
     if (!newMessage.trim() || sending) return
     setSending(true)
-
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-
     await supabase.from('messages').insert({
       patient_id: userId,
       sender_id: user.id,
       sender_role: profile?.role || 'patient',
       body: newMessage.trim(),
     })
-
     setNewMessage('')
     setSending(false)
-
-    // Refresh
-    const { data } = await supabase
-      .from('messages')
-      .select('*, profiles(full_name, role)')
-      .eq('patient_id', userId)
-      .order('created_at', { ascending: true })
+    const { data } = await supabase.from('messages').select('*, profiles(full_name, role)').eq('patient_id', userId).order('created_at', { ascending: true })
     setMessages(data || [])
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A1628', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF7F2', display: 'flex', flexDirection: 'column' }}>
       <Navbar role="patient" />
-      <div style={{ maxWidth: '700px', margin: '0 auto', padding: '32px 20px', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '32px', color: '#fff', margin: '0 0 8px' }}>
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '40px 20px', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <p style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', marginBottom: '8px' }}>Portal</p>
+        <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '38px', color: '#0A1628', margin: '0 0 8px' }}>
           {t.messagesTitle}
         </h1>
         <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', marginBottom: '24px' }} />
 
         {/* Messages area */}
         <div style={{
-          flex: 1, background: 'rgba(13,31,60,0.8)', border: '1px solid rgba(0,194,168,0.15)',
-          borderRadius: '12px', padding: '20px', overflowY: 'auto',
-          minHeight: '400px', maxHeight: '500px', display: 'flex', flexDirection: 'column', gap: '12px'
+          flex: 1, background: '#fff', border: '1px solid #E5E5E5',
+          borderRadius: '16px', padding: '20px',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+          minHeight: '400px', maxHeight: '520px', overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: '14px',
         }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-              <div style={{ width: '32px', height: '32px', border: '2px solid rgba(0,194,168,0.2)', borderTop: '2px solid #00C2A8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ width: '32px', height: '32px', border: '2px solid #E5E5E5', borderTop: '2px solid #0A1628', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             </div>
           ) : messages.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Outfit, sans-serif', fontSize: '14px' }}>{t.noMessages}</p>
+              <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', fontSize: '14px' }}>{t.noMessages}</p>
             </div>
           ) : (
             messages.map((msg, i) => {
@@ -99,26 +92,30 @@ export default function Messages() {
               const isDoctor = msg.sender_role === 'doctor'
               return (
                 <div key={i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>
+                  {/* Avatar */}
                   <div style={{
-                    width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
-                    background: isDoctor ? 'linear-gradient(135deg, #C9A84C, #a88530)' : 'linear-gradient(135deg, #00C2A8, #00A891)',
+                    width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                    background: isDoctor ? '#C9A84C' : '#0A1628',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '12px', fontWeight: 700, color: '#0A1628',
+                    fontSize: '12px', fontWeight: 700, color: '#fff',
                   }}>
                     {isDoctor ? 'Dr' : (msg.profiles?.full_name?.[0] || 'P')}
                   </div>
+                  {/* Bubble */}
                   <div style={{
-                    maxWidth: '70%', padding: '10px 14px', borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                    background: isMe ? 'rgba(0,194,168,0.2)' : 'rgba(201,168,76,0.12)',
-                    border: `1px solid ${isMe ? 'rgba(0,194,168,0.3)' : 'rgba(201,168,76,0.25)'}`,
+                    maxWidth: '72%', padding: '11px 15px',
+                    borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    // Patient sent = teal, Doctor = light card
+                    background: isMe ? '#00C2A8' : '#FAF7F2',
+                    border: isMe ? 'none' : '1px solid #E5E5E5',
                   }}>
                     {!isMe && (
-                      <div style={{ fontSize: '11px', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', fontWeight: 600, marginBottom: '4px' }}>
+                      <div style={{ fontSize: '11px', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', fontWeight: 700, marginBottom: '4px' }}>
                         {isDoctor ? 'Dr. Fernando' : msg.profiles?.full_name}
                       </div>
                     )}
-                    <p style={{ color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>{msg.body}</p>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
+                    <p style={{ color: isMe ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>{msg.body}</p>
+                    <div style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.6)' : 'rgba(42,42,42,0.35)', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
@@ -137,19 +134,22 @@ export default function Messages() {
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
             placeholder={t.messagePlaceholder}
             style={{
-              flex: 1, padding: '12px 16px',
-              background: 'rgba(13,31,60,0.8)', border: '1px solid rgba(0,194,168,0.2)',
-              borderRadius: '8px', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '14px', outline: 'none',
+              flex: 1, padding: '13px 16px', minHeight: '48px',
+              background: '#fff', border: '1px solid #E5E5E5',
+              borderRadius: '12px', color: '#2A2A2A',
+              fontFamily: 'Outfit, sans-serif', fontSize: '14px', outline: 'none',
             }}
           />
           <button
             onClick={sendMessage}
             disabled={sending || !newMessage.trim()}
             style={{
-              padding: '12px 24px', background: 'linear-gradient(135deg, #00C2A8, #00A891)',
-              border: 'none', borderRadius: '8px', color: '#0A1628',
+              padding: '13px 24px', minHeight: '48px',
+              background: '#0A1628',
+              border: 'none', borderRadius: '12px', color: '#fff',
               fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-              opacity: sending || !newMessage.trim() ? 0.5 : 1,
+              opacity: sending || !newMessage.trim() ? 0.45 : 1,
+              flexShrink: 0,
             }}
           >{t.send}</button>
         </div>

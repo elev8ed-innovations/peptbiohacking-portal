@@ -1,7 +1,15 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
+
+const inp = {
+  width: '100%', padding: '13px 16px',
+  background: '#fff', border: '1px solid #E5E5E5',
+  borderRadius: '10px', color: '#2A2A2A',
+  fontFamily: 'Outfit, sans-serif', fontSize: '14px',
+  outline: 'none', boxSizing: 'border-box',
+}
 
 export default function Login() {
   const navigate = useNavigate()
@@ -9,207 +17,180 @@ export default function Login() {
   const [gateCleared, setGateCleared] = useState(false)
   const [ageCheck, setAgeCheck] = useState(false)
   const [waiverCheck, setWaiverCheck] = useState(false)
-  const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('patient')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleAuth = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      if (isRegister) {
-        const { data, error } = await supabase.auth.signUp({
-          email, password,
-          options: { data: { full_name: fullName, role } }
-        })
-        if (error) throw error
-        navigate(role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-        navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
-      }
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+      navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
     } catch (e) {
       setError(e.message)
     }
     setLoading(false)
   }
 
-  const pageStyle = {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #0A1628 0%, #0D1F3C 60%, #0A1628 100%)',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    padding: '20px', position: 'relative', fontFamily: 'Outfit, sans-serif',
-  }
-
-  const inputStyle = {
-    width: '100%', padding: '12px 16px',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,194,168,0.25)',
-    borderRadius: '8px', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '14px',
-    outline: 'none', boxSizing: 'border-box',
-  }
-
-  const btnPrimary = {
-    width: '100%', padding: '14px',
-    background: '#00C2A8',
-    border: 'none', borderRadius: '8px', color: '#0A1628',
-    fontFamily: 'Outfit, sans-serif', fontSize: '15px', fontWeight: 600,
-    cursor: 'pointer', letterSpacing: '0.5px',
-  }
-
-  // Wordmark
   const Wordmark = () => (
     <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-      <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '32px', fontWeight: 700, letterSpacing: '4px' }}>
-        <span style={{ color: '#fff' }}>PEPT </span>
+      <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '30px', fontWeight: 700, letterSpacing: '4px' }}>
+        <span style={{ color: '#0A1628' }}>PEPT</span>
         <span style={{ color: '#00C2A8' }}>BIO</span>
-        <span style={{ color: '#fff' }}> HACKING</span>
+        <span style={{ color: '#0A1628' }}>HACKING</span>
       </div>
-      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', letterSpacing: '3px', marginTop: '6px', fontFamily: 'Outfit, sans-serif' }}>
-        {lang === 'es' ? 'PORTAL MÉDICO' : 'MEDICAL PORTAL'}
+      <div style={{ color: '#2A2A2A', opacity: 0.45, fontSize: '11px', letterSpacing: '3px', marginTop: '5px', fontFamily: 'Outfit, sans-serif', fontWeight: 600, textTransform: 'uppercase' }}>
+        {lang === 'es' ? 'Portal Médico' : 'Medical Portal'}
       </div>
-      <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '12px auto 0' }} />
+      <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '10px auto 0' }} />
     </div>
   )
 
-  // Lang toggle button
   const LangToggle = () => (
     <button onClick={toggleLang} style={{
-      position: 'absolute', top: '20px', right: '20px',
-      background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)',
+      position: 'fixed', top: '20px', right: '20px',
+      background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.5)',
       color: '#C9A84C', padding: '5px 14px', borderRadius: '20px',
       fontFamily: 'Outfit, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '1px',
     }}>{lang === 'es' ? 'EN' : 'ES'}</button>
   )
 
-  const cardStyle = {
-    background: 'rgba(10,22,40,0.85)',
-    border: '1px solid rgba(0,194,168,0.15)',
-    borderRadius: '12px', padding: '32px 36px',
-    width: '100%', maxWidth: '440px',
-    backdropFilter: 'blur(20px)',
-    marginTop: '24px',
-  }
+  const CheckBox = ({ checked, onToggle, children }) => (
+    <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '20px' }} onClick={onToggle}>
+      <div style={{
+        width: '22px', height: '22px', minWidth: '22px', borderRadius: '5px',
+        border: `2px solid ${checked ? '#0A1628' : '#E5E5E5'}`,
+        background: checked ? '#0A1628' : '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px', transition: 'all 0.15s',
+      }}>
+        {checked && <span style={{ color: '#fff', fontSize: '12px', fontWeight: 700 }}>✓</span>}
+      </div>
+      <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: '14px', color: '#2A2A2A', lineHeight: 1.5 }}>
+        {children}
+      </div>
+    </label>
+  )
 
+  // Gate screen
   if (!gateCleared) {
     return (
-      <div style={pageStyle}>
+      <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-4 py-12">
         <LangToggle />
-        <Wordmark />
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          <Wordmark />
+          <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', marginBottom: '4px' }}>
+              {lang === 'es' ? 'Bienvenido' : 'Welcome'}
+            </h2>
+            <p style={{ color: '#2A2A2A', opacity: 0.5, fontSize: '13px', fontFamily: 'Outfit, sans-serif', marginBottom: '24px' }}>
+              {lang === 'es' ? 'Confirma los siguientes puntos para acceder' : 'Confirm the following points to access'}
+            </p>
 
-        <div style={cardStyle}>
-          <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600, margin: '0 0 4px', fontFamily: 'Cormorant Garamond, serif' }}>
-            {lang === 'es' ? 'Bienvenido' : 'Welcome'}
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', margin: '0 0 24px' }}>
-            {lang === 'es' ? 'Confirma los siguientes puntos para acceder' : 'Confirm the following points to access'}
-          </p>
-
-          {/* Age checkbox */}
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '20px' }}
-            onClick={() => setAgeCheck(!ageCheck)}>
-            <div style={{
-              width: '20px', height: '20px', minWidth: '20px', borderRadius: '4px',
-              border: `2px solid ${ageCheck ? '#00C2A8' : 'rgba(255,255,255,0.2)'}`,
-              background: ageCheck ? '#00C2A8' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px', transition: 'all 0.2s',
-            }}>
-              {ageCheck && <span style={{ color: '#0A1628', fontSize: '12px', fontWeight: 700 }}>✓</span>}
-            </div>
-            <div>
-              <div style={{ color: '#fff', fontSize: '14px', fontWeight: 500, marginBottom: '3px' }}>
+            <CheckBox checked={ageCheck} onToggle={() => setAgeCheck(!ageCheck)}>
+              <span style={{ fontWeight: 500 }}>
                 {lang === 'es' ? 'Confirmo que tengo 18 años o más' : 'I confirm that I am 18 years of age or older'}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
+              </span>
+              <br />
+              <span style={{ fontSize: '12px', opacity: 0.55 }}>
                 {lang === 'es' ? 'Este portal contiene información médica para adultos.' : 'This portal contains medical information for adults.'}
-              </div>
-            </div>
-          </label>
+              </span>
+            </CheckBox>
 
-          {/* COFEPRIS checkbox */}
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '28px' }}
-            onClick={() => setWaiverCheck(!waiverCheck)}>
-            <div style={{
-              width: '20px', height: '20px', minWidth: '20px', borderRadius: '4px',
-              border: `2px solid ${waiverCheck ? '#00C2A8' : 'rgba(255,255,255,0.2)'}`,
-              background: waiverCheck ? '#00C2A8' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px', transition: 'all 0.2s',
-            }}>
-              {waiverCheck && <span style={{ color: '#0A1628', fontSize: '12px', fontWeight: 700 }}>✓</span>}
-            </div>
-            <div>
-              <div style={{ color: '#fff', fontSize: '14px', fontWeight: 500, marginBottom: '3px' }}>
+            <CheckBox checked={waiverCheck} onToggle={() => setWaiverCheck(!waiverCheck)}>
+              <span style={{ fontWeight: 500 }}>
                 {lang === 'es' ? 'Acepto el aviso médico COFEPRIS' : 'I accept the COFEPRIS medical notice'}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', lineHeight: '1.5' }}>
+              </span>
+              <br />
+              <span style={{ fontSize: '12px', opacity: 0.55 }}>
                 {lang === 'es'
-                  ? `Los servicios ofrecidos están bajo supervisión médica. Los péptidos son de uso bajo prescripción. Cédula Profesional #4667632.`
-                  : `The services offered are under medical supervision. Peptides are for prescription use only. Professional License #4667632.`}
-              </div>
-            </div>
-          </label>
+                  ? 'Los servicios ofrecidos están bajo supervisión médica. Los péptidos son de uso bajo prescripción. Cédula Profesional #4667632.'
+                  : 'The services offered are under medical supervision. Peptides are for prescription use only. Professional License #4667632.'}
+              </span>
+            </CheckBox>
 
-          <button
-            onClick={() => { if (ageCheck && waiverCheck) setGateCleared(true) }}
-            disabled={!ageCheck || !waiverCheck}
-            style={{ ...btnPrimary, opacity: (!ageCheck || !waiverCheck) ? 0.4 : 1, cursor: (!ageCheck || !waiverCheck) ? 'not-allowed' : 'pointer' }}
-          >
-            {lang === 'es' ? 'Continuar al acceso' : 'Continue to access'}
-          </button>
-        </div>
-
-        <div style={{ marginTop: '24px', color: 'rgba(255,255,255,0.25)', fontSize: '11px', letterSpacing: '0.5px' }}>
-          peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
+            <button
+              onClick={() => { if (ageCheck && waiverCheck) setGateCleared(true) }}
+              disabled={!ageCheck || !waiverCheck}
+              style={{
+                width: '100%', padding: '14px', minHeight: '44px',
+                background: ageCheck && waiverCheck ? '#0A1628' : '#E5E5E5',
+                border: 'none', borderRadius: '10px',
+                color: ageCheck && waiverCheck ? '#fff' : '#2A2A2A',
+                fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '15px',
+                cursor: ageCheck && waiverCheck ? 'pointer' : 'not-allowed', transition: 'all 0.2s',
+              }}
+            >
+              {lang === 'es' ? 'Continuar al acceso' : 'Continue to access'}
+            </button>
+          </div>
+          <p style={{ textAlign: 'center', marginTop: '20px', color: '#2A2A2A', opacity: 0.3, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
+            peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
+          </p>
         </div>
       </div>
     )
   }
 
+  // Login form
   return (
-    <div style={pageStyle}>
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-4 py-12">
       <LangToggle />
-      <Wordmark />
+      <div style={{ width: '100%', maxWidth: '420px' }}>
+        <Wordmark />
+        <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '24px', color: '#0A1628', marginBottom: '24px' }}>
+            {lang === 'es' ? 'Iniciar sesión' : 'Sign In'}
+          </h2>
 
-      <div style={cardStyle}>
-        <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600, margin: '0 0 20px', fontFamily: 'Cormorant Garamond, serif' }}>
-          {isRegister ? (lang === 'es' ? 'Crear cuenta' : 'Create Account') : (lang === 'es' ? 'Iniciar sesión' : 'Sign In')}
-        </h2>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#2A2A2A', opacity: 0.55, fontFamily: 'Outfit, sans-serif', marginBottom: '6px' }}>
+                {lang === 'es' ? 'Correo electrónico' : 'Email'}
+              </label>
+              <input style={inp} type="email" placeholder="correo@ejemplo.com" value={email} onChange={e => setEmail(e.target.value)} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#2A2A2A', opacity: 0.55, fontFamily: 'Outfit, sans-serif', marginBottom: '6px' }}>
+                {lang === 'es' ? 'Contraseña' : 'Password'}
+              </label>
+              <input style={inp} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+            </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {isRegister && (
-            <input style={inputStyle} placeholder={lang === 'es' ? 'Nombre completo' : 'Full Name'} value={fullName} onChange={e => setFullName(e.target.value)} />
-          )}
-          <input style={inputStyle} placeholder={lang === 'es' ? 'Correo electrónico' : 'Email'} type="email" value={email} onChange={e => setEmail(e.target.value)} />
-          <input style={inputStyle} placeholder={lang === 'es' ? 'Contraseña' : 'Password'} type="password" value={password} onChange={e => setPassword(e.target.value)} />
-          {isRegister && (
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={role} onChange={e => setRole(e.target.value)}>
-              <option value="patient">{lang === 'es' ? 'Paciente' : 'Patient'}</option>
-              <option value="doctor">{lang === 'es' ? 'Médico' : 'Doctor'}</option>
-            </select>
-          )}
+            {error && <p style={{ color: '#dc2626', fontSize: '13px', fontFamily: 'Outfit, sans-serif' }}>{error}</p>}
+
+            <button type="submit" disabled={loading} style={{
+              padding: '14px', background: loading ? '#1A2B47' : '#0A1628',
+              border: 'none', borderRadius: '10px', color: '#fff', minHeight: '44px',
+              fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '15px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}>
+              {loading ? (
+                <>
+                  <span style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                  {lang === 'es' ? 'Entrando...' : 'Signing in...'}
+                </>
+              ) : (lang === 'es' ? 'Iniciar sesión' : 'Sign In')}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', color: '#2A2A2A', opacity: 0.5, fontSize: '13px', fontFamily: 'Outfit, sans-serif', marginTop: '20px' }}>
+            {lang === 'es' ? '¿No tienes cuenta? ' : "Don't have an account? "}
+            <Link to="/register" style={{ color: '#00C2A8', fontWeight: 600, textDecoration: 'none' }}>
+              {lang === 'es' ? 'Regístrate' : 'Sign up'}
+            </Link>
+          </p>
         </div>
-
-        {error && <p style={{ color: '#ff6b6b', fontSize: '13px', marginTop: '8px' }}>{error}</p>}
-
-        <button onClick={handleAuth} disabled={loading} style={{ ...btnPrimary, marginTop: '20px', opacity: loading ? 0.7 : 1 }}>
-          {loading ? '...' : (isRegister ? (lang === 'es' ? 'Crear cuenta' : 'Create Account') : (lang === 'es' ? 'Iniciar sesión' : 'Sign In'))}
-        </button>
-
-        <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-          <span onClick={() => setIsRegister(!isRegister)} style={{ color: '#00C2A8', cursor: 'pointer' }}>
-            {isRegister ? (lang === 'es' ? 'Ya tengo cuenta' : 'I already have an account') : (lang === 'es' ? 'Crear cuenta nueva' : 'Create new account')}
-          </span>
+        <p style={{ textAlign: 'center', marginTop: '20px', color: '#2A2A2A', opacity: 0.3, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
+          peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
         </p>
       </div>
-
-      <div style={{ marginTop: '24px', color: 'rgba(255,255,255,0.25)', fontSize: '11px', letterSpacing: '0.5px' }}>
-        peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
-      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
