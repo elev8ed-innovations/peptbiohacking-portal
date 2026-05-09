@@ -21,6 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,9 +29,13 @@ export default function Login() {
         supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
           navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
         })
+      } else {
+        setChecking(false)
       }
     })
   }, [])
+
+  if (checking) return null
 
   const handleLogin = async (e) => {
     e.preventDefault()
