@@ -16,7 +16,7 @@ export default function Login() {
   const { t, lang, toggleLang } = useLang()
   const [gateCleared, setGateCleared] = useState(false)
   const [ageCheck, setAgeCheck] = useState(false)
-  const [waiverCheck, setWaiverCheck] = useState(false)
+  const [researchCheck, setResearchCheck] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -101,28 +101,28 @@ export default function Login() {
               </span>
             </CheckBox>
 
-            <CheckBox checked={waiverCheck} onToggle={() => setWaiverCheck(!waiverCheck)}>
+            <CheckBox checked={researchCheck} onToggle={() => setResearchCheck(!researchCheck)}>
               <span style={{ fontWeight: 500 }}>
-                {lang === 'es' ? 'Acepto el aviso médico COFEPRIS' : 'I accept the COFEPRIS medical notice'}
+                {lang === 'es' ? 'Entiendo que este portal es de uso educativo e investigativo' : 'I understand this portal is for educational and research use'}
               </span>
               <br />
               <span style={{ fontSize: '12px', opacity: 0.55 }}>
                 {lang === 'es'
-                  ? 'Los servicios ofrecidos están bajo supervisión médica. Los péptidos son de uso bajo prescripción. Cédula Profesional #4667632.'
-                  : 'The services offered are under medical supervision. Peptides are for prescription use only. Professional License #4667632.'}
+                  ? 'El contenido es supervisado por un médico certificado y no sustituye el diagnóstico médico independiente.'
+                  : 'Content is supervised by a licensed physician and does not substitute independent medical diagnosis.'}
               </span>
             </CheckBox>
 
             <button
-              onClick={() => { if (ageCheck && waiverCheck) setGateCleared(true) }}
-              disabled={!ageCheck || !waiverCheck}
+              onClick={() => { if (ageCheck && researchCheck) setGateCleared(true) }}
+              disabled={!ageCheck || !researchCheck}
               style={{
                 width: '100%', padding: '14px', minHeight: '44px',
-                background: ageCheck && waiverCheck ? '#0A1628' : '#E5E5E5',
+                background: ageCheck && researchCheck ? '#0A1628' : '#E5E5E5',
                 border: 'none', borderRadius: '10px',
-                color: ageCheck && waiverCheck ? '#fff' : '#2A2A2A',
+                color: ageCheck && researchCheck ? '#fff' : '#2A2A2A',
                 fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '15px',
-                cursor: ageCheck && waiverCheck ? 'pointer' : 'not-allowed', transition: 'all 0.2s',
+                cursor: ageCheck && researchCheck ? 'pointer' : 'not-allowed', transition: 'all 0.2s',
               }}
             >
               {lang === 'es' ? 'Continuar al acceso' : 'Continue to access'}
