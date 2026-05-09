@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
@@ -21,6 +21,16 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
+          navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
+        })
+      }
+    })
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
