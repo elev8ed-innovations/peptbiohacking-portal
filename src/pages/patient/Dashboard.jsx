@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import IntroModal from '../../components/IntroModal'
+import WaiverGate from '../../components/WaiverGate'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
 
@@ -20,16 +21,24 @@ const card = {
 export default function PatientDashboard() {
   const { t } = useLang()
   const navigate = useNavigate()
+  const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
   const [consultations, setConsultations] = useState([])
   const [checkins, setCheckins] = useState([])
   const [loading, setLoading] = useState(true)
   const [showIntro, setShowIntro] = useState(false)
+  const [showWaiver, setShowWaiver] = useState(false)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { navigate('/login'); return }
+
+      // role guard — doctors don't belong here
+      const { data: roleCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (roleCheck?.role === 'doctor') { navigate('/doctor/dashboard'); return }
+
+      setUserId(user.id)
 
       const [{ data: prof }, { data: consults }, { data: chks }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
@@ -37,7 +46,6 @@ export default function PatientDashboard() {
         supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }).limit(3),
       ])
 
-      // Fallback chain: profile full_name → auth metadata full_name → auth metadata name → email prefix
       const resolvedName =
         prof?.full_name ||
         user.user_metadata?.full_name ||
@@ -49,7 +57,12 @@ export default function PatientDashboard() {
       setCheckins(chks || [])
       setLoading(false)
 
-      if (prof && prof.has_seen_intro === false) setShowIntro(true)
+      // Show waiver first if not signed, otherwise intro modal
+      if (!prof?.has_signed_waiver) {
+        setShowWaiver(true)
+      } else if (prof?.has_seen_intro === false) {
+        setShowIntro(true)
+      }
     }
     load()
   }, [])
@@ -67,7 +80,20 @@ export default function PatientDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2' }}>
       <Navbar role="patient" />
-      {showIntro && <IntroModal onDismiss={() => setShowIntro(false)} />}
+
+      {/* Waiver gate — blocks everything until signed */}
+      {showWaiver && userId && (
+        <WaiverGate
+          userId={userId}
+          onAccepted={() => {
+            setShowWaiver(false)
+            setProfile(p => ({ ...p, has_signed_waiver: true }))
+            if (profile?.has_seen_intro === false) setShowIntro(true)
+          }}
+        />
+      )}
+
+      {showIntro && !showWaiver && <IntroModal onDismiss={() => setShowIntro(false)} />}
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '40px 20px' }}>
 
@@ -97,7 +123,7 @@ export default function PatientDashboard() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
 
-          {/* Active Protocol — full width */}
+          {/* Active Protocol */}
           <div style={card}>
             <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', margin: '0 0 16px' }}>
               {t.myProtocol}
