@@ -26,30 +26,21 @@ export default function PatientDashboard() {
   const [consultations, setConsultations] = useState([])
   const [checkins, setCheckins] = useState([])
   const [loading, setLoading] = useState(true)
-  const [checking, setChecking] = useState(true)
   const [showIntro, setShowIntro] = useState(false)
   const [showWaiver, setShowWaiver] = useState(false)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
+      if (!user) { navigate('/login', { replace: true }); return }
 
-      // role guard — check BEFORE setting any state so waiver never renders for doctors
-      const { data: roleCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!roleCheck || roleCheck.role === 'doctor') { 
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+
+      // Doctors go to doctor dashboard — hard redirect, no flash
+      if (prof?.role === 'doctor') {
         navigate('/doctor/dashboard', { replace: true })
-        return 
+        return
       }
-
-      setChecking(false)
-      setUserId(user.id)
-
-      const [{ data: prof }, { data: consults }, { data: chks }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('consultations').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }).limit(3),
-      ])
 
       const resolvedName =
         prof?.full_name ||
@@ -57,12 +48,18 @@ export default function PatientDashboard() {
         user.user_metadata?.name ||
         user.email?.split('@')[0]
 
+      setUserId(user.id)
       setProfile({ ...(prof || {}), full_name: resolvedName })
+
+      const [{ data: consults }, { data: chks }] = await Promise.all([
+        supabase.from('consultations').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }).limit(3),
+      ])
+
       setConsultations(consults || [])
       setCheckins(chks || [])
       setLoading(false)
 
-      // Show waiver first if not signed, otherwise intro modal
       if (!prof?.has_signed_waiver) {
         setShowWaiver(true)
       } else if (prof?.has_seen_intro === false) {
@@ -75,20 +72,15 @@ export default function PatientDashboard() {
   const latestConsult = consultations[0]
   const protocol = latestConsult?.peptide_protocol || []
 
-  if (checking) return null
-
+  // Blank screen while checking auth/role — no flash, no spinner
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '40px', height: '40px', border: '3px solid #E5E5E5', borderTop: '3px solid #0A1628', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    <div style={{ minHeight: '100vh', background: '#FAF7F2' }} />
   )
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2' }}>
       <Navbar role="patient" />
 
-      {/* Waiver gate — blocks everything until signed */}
       {showWaiver && userId && (
         <WaiverGate
           userId={userId}
@@ -104,7 +96,6 @@ export default function PatientDashboard() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '40px 20px' }}>
 
-        {/* Hero greeting */}
         <div style={{ marginBottom: '36px' }}>
           <p style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', marginBottom: '8px' }}>
             {new Date().toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -115,22 +106,13 @@ export default function PatientDashboard() {
           <div style={{ width: '48px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', marginTop: '12px' }} />
         </div>
 
-        {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', marginBottom: '28px' }}>
           <StatCard label={t.consultations} value={consultations.length} icon="🔬" />
           <StatCard label={t.recentCheckins} value={checkins.length} icon="📊" />
-          <StatCard
-            label={t.booking}
-            value="+"
-            icon="📅"
-            onClick={() => navigate('/patient/booking')}
-            accent
-          />
+          <StatCard label={t.booking} value="+" icon="📅" onClick={() => navigate('/patient/booking')} accent />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-
-          {/* Active Protocol */}
           <div style={card}>
             <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', margin: '0 0 16px' }}>
               {t.myProtocol}
@@ -152,17 +134,8 @@ export default function PatientDashboard() {
                         <td style={{ padding: '12px', color: '#2A2A2A', opacity: 0.7 }}>{p.dose || '—'}</td>
                         <td style={{ padding: '12px', color: '#2A2A2A', opacity: 0.7 }}>{p.frequency || '—'}</td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <a
-                            href={`${SHOP_URL}/products/${slugify(p.name)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'inline-block', padding: '6px 14px',
-                              background: '#C9A84C', color: '#fff', borderRadius: '8px',
-                              fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '12px',
-                              textDecoration: 'none', whiteSpace: 'nowrap',
-                            }}
-                          >
+                          <a href={`${SHOP_URL}/products/${slugify(p.name)}`} target="_blank" rel="noopener noreferrer"
+                            style={{ display: 'inline-block', padding: '6px 14px', background: '#C9A84C', color: '#fff', borderRadius: '8px', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '12px', textDecoration: 'none' }}>
                             {t.reorder}
                           </a>
                         </td>
@@ -172,20 +145,13 @@ export default function PatientDashboard() {
                 </table>
               </div>
             ) : (
-              <p style={{ color: '#2A2A2A', opacity: 0.45, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>
-                {t.noProtocol}
-              </p>
+              <p style={{ color: '#2A2A2A', opacity: 0.45, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>{t.noProtocol}</p>
             )}
           </div>
 
-          {/* Two-col on md+ */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-
-            {/* Recent Check-ins */}
             <div style={card}>
-              <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#0A1628', margin: '0 0 16px' }}>
-                {t.recentCheckins}
-              </h3>
+              <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#0A1628', margin: '0 0 16px' }}>{t.recentCheckins}</h3>
               {checkins.length === 0 ? (
                 <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>{t.noCheckins}</p>
               ) : (
@@ -193,12 +159,8 @@ export default function PatientDashboard() {
                   {checkins.map((c, i) => (
                     <div key={i} style={{ borderBottom: '1px solid #F5F5F5', paddingBottom: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span style={{ color: '#2A2A2A', opacity: 0.45, fontSize: '12px', fontFamily: 'Outfit, sans-serif' }}>
-                          {new Date(c.created_at).toLocaleDateString()}
-                        </span>
-                        <span style={{ color: '#0A1628', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 700 }}>
-                          {t.wellnessScore}: {c.wellness_score}/10
-                        </span>
+                        <span style={{ color: '#2A2A2A', opacity: 0.45, fontSize: '12px', fontFamily: 'Outfit, sans-serif' }}>{new Date(c.created_at).toLocaleDateString()}</span>
+                        <span style={{ color: '#0A1628', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 700 }}>{t.wellnessScore}: {c.wellness_score}/10</span>
                       </div>
                       {c.notes && <p style={{ color: '#2A2A2A', opacity: 0.65, fontSize: '13px', fontFamily: 'Outfit, sans-serif', margin: 0 }}>{c.notes}</p>}
                     </div>
@@ -207,11 +169,8 @@ export default function PatientDashboard() {
               )}
             </div>
 
-            {/* Quick actions */}
             <div style={card}>
-              <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#0A1628', margin: '0 0 16px' }}>
-                Quick Actions
-              </h3>
+              <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#0A1628', margin: '0 0 16px' }}>Quick Actions</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {[
                   { label: t.checkin, path: '/patient/checkin', color: '#0A1628' },
@@ -226,31 +185,25 @@ export default function PatientDashboard() {
                     borderRadius: '10px', color: a.color,
                     fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '14px',
                     cursor: 'pointer', textAlign: 'left',
-                  }}>
-                    {a.label} →
-                  </button>
+                  }}>{a.label} →</button>
                 ))}
               </div>
             </div>
           </div>
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
 
 function StatCard({ label, value, icon, onClick, accent }) {
   return (
-    <div
-      onClick={onClick}
-      style={{
-        background: '#fff', border: `1px solid ${accent ? '#00C2A8' : '#E5E5E5'}`,
-        borderRadius: '14px', padding: '20px',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        cursor: onClick ? 'pointer' : 'default',
-      }}
-    >
+    <div onClick={onClick} style={{
+      background: '#fff', border: `1px solid ${accent ? '#00C2A8' : '#E5E5E5'}`,
+      borderRadius: '14px', padding: '20px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+      cursor: onClick ? 'pointer' : 'default',
+    }}>
       <span style={{ fontSize: '24px' }}>{icon}</span>
       <p style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '32px', color: accent ? '#00C2A8' : '#0A1628', margin: '8px 0 2px', fontWeight: 700 }}>{value}</p>
       <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: '12px', color: '#2A2A2A', opacity: 0.5, margin: 0 }}>{label}</p>
