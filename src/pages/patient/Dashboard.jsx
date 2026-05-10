@@ -26,6 +26,7 @@ export default function PatientDashboard() {
   const [consultations, setConsultations] = useState([])
   const [checkins, setCheckins] = useState([])
   const [loading, setLoading] = useState(true)
+  const [checking, setChecking] = useState(true)
   const [showIntro, setShowIntro] = useState(false)
   const [showWaiver, setShowWaiver] = useState(false)
 
@@ -34,10 +35,14 @@ export default function PatientDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
 
-      // role guard — doctors don't belong here
+      // role guard — check BEFORE setting any state so waiver never renders for doctors
       const { data: roleCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (roleCheck?.role === 'doctor') { navigate('/doctor/dashboard'); return }
+      if (!roleCheck || roleCheck.role === 'doctor') { 
+        navigate('/doctor/dashboard', { replace: true })
+        return 
+      }
 
+      setChecking(false)
       setUserId(user.id)
 
       const [{ data: prof }, { data: consults }, { data: chks }] = await Promise.all([
@@ -69,6 +74,8 @@ export default function PatientDashboard() {
 
   const latestConsult = consultations[0]
   const protocol = latestConsult?.peptide_protocol || []
+
+  if (checking) return null
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
