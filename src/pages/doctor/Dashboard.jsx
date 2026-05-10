@@ -20,8 +20,6 @@ export default function DoctorDashboard() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
-      const { data: roleCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (roleCheck?.role !== 'doctor') { navigate('/patient/dashboard'); return }
 
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
