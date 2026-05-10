@@ -32,7 +32,7 @@ export default function Register() {
       password: form.password,
       options: {
         data: { full_name: form.name, role: form.role },
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/confirmed`,
       },
     })
 
@@ -67,22 +67,30 @@ export default function Register() {
   )
 
   if (success) return (
-    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center px-4">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-[#00C2A8]/10 border border-[#00C2A8]/30 rounded-full flex items-center justify-center mx-auto mb-5">
-          <svg className="w-8 h-8" style={{ color: '#00C2A8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+    <div style={{ minHeight: '100vh', background: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ textAlign: 'center', maxWidth: '380px', width: '100%' }}>
+        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '30px', fontWeight: 700, letterSpacing: '4px', marginBottom: '32px' }}>
+          <span style={{ color: '#0A1628' }}>PEPT</span>
+          <span style={{ color: '#00C2A8' }}>BIO</span>
+          <span style={{ color: '#0A1628' }}>HACKING</span>
         </div>
-        <h2 style={{ fontFamily: 'Cormorant Garamond, serif', color: '#0A1628', fontSize: '26px', marginBottom: '10px' }}>
-          {lang === 'es' ? '¡Registro exitoso!' : 'Registration successful!'}
-        </h2>
-        <p style={{ color: '#2A2A2A', opacity: 0.6, fontSize: '14px', fontFamily: 'Outfit, sans-serif', marginBottom: '24px' }}>
-          {lang === 'es' ? 'Revisa tu correo para confirmar tu cuenta, luego inicia sesión.' : 'Check your email to confirm your account, then sign in.'}
-        </p>
-        <Link to="/login" style={{ display: 'inline-block', padding: '13px 32px', background: '#0A1628', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '14px' }}>
-          {lang === 'es' ? 'Ir a iniciar sesión' : 'Go to sign in'}
-        </Link>
+        <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '40px 32px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(0,194,168,0.1)', border: '2px solid rgba(0,194,168,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <span style={{ fontSize: '28px', color: '#00C2A8' }}>✓</span>
+          </div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', color: '#0A1628', fontSize: '26px', margin: '0 0 12px' }}>
+            {lang === 'es' ? '¡Registro exitoso!' : 'Registration successful!'}
+          </h2>
+          <p style={{ color: '#2A2A2A', opacity: 0.6, fontSize: '14px', fontFamily: 'Outfit, sans-serif', lineHeight: 1.6, margin: '0 0 8px' }}>
+            {lang === 'es' ? 'Revisa tu correo y haz clic en el enlace de confirmación.' : 'Check your email and click the confirmation link.'}
+          </p>
+          <p style={{ color: '#2A2A2A', opacity: 0.4, fontSize: '12px', fontFamily: 'Outfit, sans-serif', margin: '0 0 28px' }}>
+            {lang === 'es' ? '(Revisa también tu carpeta de spam)' : '(Check your spam folder too)'}
+          </p>
+          <Link to="/login" style={{ display: 'block', padding: '14px', background: '#0A1628', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '15px' }}>
+            {lang === 'es' ? 'Ir a iniciar sesión' : 'Go to Sign In →'}
+          </Link>
+        </div>
       </div>
     </div>
   )
