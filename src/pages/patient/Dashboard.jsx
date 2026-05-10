@@ -34,7 +34,12 @@ export default function PatientDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login', { replace: true }); return }
 
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      let prof = null
+      for (let i = 0; i < 3; i++) {
+        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        if (p) { prof = p; break }
+        await new Promise(r => setTimeout(r, 400))
+      }
 
       // Doctors go to doctor dashboard — hard redirect, no flash
       if (prof?.role === 'doctor') {
