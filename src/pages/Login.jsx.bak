@@ -44,12 +44,7 @@ export default function Login() {
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
       if (signInError) throw signInError
-      let profile = null
-      for (let i = 0; i < 3; i++) {
-        const { data: p } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-        if (p) { profile = p; break }
-        await new Promise(r => setTimeout(r, 400))
-      }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
       navigate(profile?.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard')
     } catch (e) {
       setError(e.message)
