@@ -38,14 +38,16 @@ export default function Register() {
 
     if (signUpError) { setError(signUpError.message); setLoading(false); return }
 
-    // Belt-and-suspenders upsert in case trigger fires before email is confirmed
+    // Belt-and-suspenders upsert — wrapped so it never crashes the success state
     if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: form.name,
-        role: form.role,
-        email: form.email,
-      }, { onConflict: 'id' })
+      try {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: form.name,
+          role: form.role,
+          email: form.email,
+        }, { onConflict: 'id' })
+      } catch (_) {}
     }
 
     setSuccess(true)
