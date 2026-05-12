@@ -18,6 +18,17 @@ export default function PatientDetail() {
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
 
+  const getSignedUrl = async (fileUrl) => {
+    let path = fileUrl
+    if (fileUrl && fileUrl.startsWith('http')) {
+      const match = fileUrl.match(/lab-uploads\/(.+)/)
+      if (!match) return fileUrl
+      path = match[1]
+    }
+    const { data } = await supabase.storage.from('lab-uploads').createSignedUrl(path, 3600)
+    return data?.signedUrl || fileUrl
+  }
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -25,14 +36,21 @@ export default function PatientDetail() {
 
       const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
-        supabase.from('messages').select('*, profiles(full_name, role)').eq('patient_id', id).order('created_at', { ascending: true }),
+        supabase.from('messages').select('*, profiles!messages_sender_id_fkey(full_name, role)')
+          .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
+          .order('created_at', { ascending: true }),
         supabase.from('lab_uploads').select('*').eq('patient_id', id).order('uploaded_at', { ascending: false }),
         supabase.from('consultations').select('*').eq('patient_id', id).order('created_at', { ascending: false }),
       ])
 
       setPatient(prof)
       setMessages(msgs || [])
-      setLabs(labData || [])
+
+      // Generate signed URLs for private bucket
+      const labsWithUrls = await Promise.all(
+        (labData || []).map(async (f) => ({ ...f, displayUrl: await getSignedUrl(f.file_url) }))
+      )
+      setLabs(labsWithUrls)
       setConsults(consultData || [])
     }
     load()
@@ -46,14 +64,17 @@ export default function PatientDetail() {
     if (!newMessage.trim() || sending) return
     setSending(true)
     await supabase.from('messages').insert({
-      patient_id: id,
       sender_id: doctorId,
+      receiver_id: id,
       sender_role: 'doctor',
-      body: newMessage.trim(),
+      content: newMessage.trim(),
     })
     setNewMessage('')
     setSending(false)
-    const { data } = await supabase.from('messages').select('*, profiles(full_name, role)').eq('patient_id', id).order('created_at', { ascending: true })
+    const { data } = await supabase.from('messages')
+      .select('*, profiles!messages_sender_id_fkey(full_name, role)')
+      .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
+      .order('created_at', { ascending: true })
     setMessages(data || [])
   }
 
@@ -134,7 +155,7 @@ export default function PatientDetail() {
                       background: isDoctor ? '#00C2A8' : '#FAF7F2',
                       border: isDoctor ? 'none' : '1px solid #E5E5E5',
                     }}>
-                      <p style={{ color: isDoctor ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>{msg.body}</p>
+                      <p style={{ color: isDoctor ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>{msg.content}</p>
                       <div style={{ fontSize: '11px', color: isDoctor ? 'rgba(255,255,255,0.6)' : 'rgba(42,42,42,0.35)', marginTop: '4px', textAlign: isDoctor ? 'right' : 'left' }}>
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
@@ -180,7 +201,7 @@ export default function PatientDetail() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px' }}>
                 {labs.map((file, i) => (
-                  <a key={i} href={file.file_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                  <a key={i} href={file.displayUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                     <div style={{ background: '#FAF7F2', border: '1px solid #E5E5E5', borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
                       <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', marginBottom: '8px' }}>
                         {file.file_name?.endsWith('.pdf') ? '📄' : '🖼'}
