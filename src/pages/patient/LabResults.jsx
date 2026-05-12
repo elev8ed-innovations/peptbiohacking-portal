@@ -10,6 +10,7 @@ export default function LabResults() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -23,34 +24,67 @@ export default function LabResults() {
   }, [])
 
   const fetchFiles = async (uid) => {
-    const { data } = await supabase.from('lab_uploads').select('*').eq('patient_id', uid).order('uploaded_at', { ascending: false })
-    setFiles(data || [])
+    const { data, error } = await supabase
+      .from('lab_uploads')
+      .select('*')
+      .eq('patient_id', uid)
+      .order('uploaded_at', { ascending: false })
+    if (!error) setFiles(data || [])
   }
 
   const handleUpload = async (file) => {
     if (!file || !userId) return
     setUploading(true)
-    const ext = file.name.split('.').pop()
-    const fileName = `${userId}/${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('consult-photos').upload(`labs/${fileName}`, file)
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage.from('consult-photos').getPublicUrl(`labs/${fileName}`)
-      await supabase.from('lab_uploads').insert({
-        patient_id: userId, file_name: file.name,
-        file_url: publicUrl, file_type: file.type, uploaded_at: new Date().toISOString(),
-      })
+    setUploadError('')
+
+    const ext = file.name.split('.').pop().toLowerCase()
+    const storagePath = `${userId}/${Date.now()}.${ext}`
+
+    // Upload to lab-uploads bucket
+    const { error: storageError } = await supabase.storage
+      .from('lab-uploads')
+      .upload(storagePath, file, { upsert: false })
+
+    if (storageError) {
+      setUploadError(storageError.message)
+      setUploading(false)
+      return
+    }
+
+    // Get public URL from lab-uploads bucket
+    const { data: { publicUrl } } = supabase.storage
+      .from('lab-uploads')
+      .getPublicUrl(storagePath)
+
+    // Insert record into lab_uploads table
+    const { error: dbError } = await supabase.from('lab_uploads').insert({
+      patient_id: userId,
+      file_name: file.name,
+      file_url: publicUrl,
+      file_type: file.type,
+      uploaded_at: new Date().toISOString(),
+    })
+
+    if (dbError) {
+      setUploadError(dbError.message)
+    } else {
       await fetchFiles(userId)
     }
+
     setUploading(false)
   }
 
   const handleDrop = (e) => {
-    e.preventDefault(); setDragOver(false)
+    e.preventDefault()
+    setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) handleUpload(file)
   }
 
-  const isPDF = (url) => url?.toLowerCase().includes('.pdf') || url?.toLowerCase().endsWith('pdf')
+  const isPDF = (url) => {
+    const lower = url?.toLowerCase() ?? ''
+    return lower.includes('.pdf') || lower.endsWith('pdf')
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2' }}>
@@ -65,7 +99,13 @@ export default function LabResults() {
           {t.uploadHint}
         </p>
 
-        {/* Mobile primary: big tap-to-upload button */}
+        {uploadError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', color: '#dc2626', fontFamily: 'Outfit, sans-serif', fontSize: '13px' }}>
+            Upload failed: {uploadError}
+          </div>
+        )}
+
+        {/* Mobile: tap-to-upload button */}
         <div className="md:hidden" style={{ marginBottom: '20px' }}>
           <button
             onClick={() => document.getElementById('lab-file-input').click()}
@@ -118,10 +158,11 @@ export default function LabResults() {
         </div>
 
         <input
-          id="lab-file-input" type="file"
+          id="lab-file-input"
+          type="file"
           accept=".pdf,.jpg,.jpeg,.png,.heic"
           style={{ display: 'none' }}
-          onChange={e => e.target.files[0] && handleUpload(e.target.files[0])}
+          onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = '' }}
         />
 
         {/* Files Grid */}
@@ -142,7 +183,6 @@ export default function LabResults() {
                   borderRadius: '12px', padding: '16px', cursor: 'pointer',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
                   display: 'flex', flexDirection: 'column', gap: '10px',
-                  transition: 'box-shadow 0.15s',
                 }}>
                   <div style={{ height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {isPDF(file.file_url) ? (

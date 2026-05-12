@@ -10,7 +10,18 @@ export default function Messages() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [userId, setUserId] = useState(null)
+  const [doctorId, setDoctorId] = useState(null)
   const bottomRef = useRef(null)
+
+  const fetchMessages = async (uid) => {
+    // Fetch full dialogue: all messages where this user is sender OR receiver
+    const { data } = await supabase
+      .from('messages')
+      .select('*, profiles!messages_sender_id_fkey(full_name, role)')
+      .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+      .order('created_at', { ascending: true })
+    setMessages(data || [])
+  }
 
   useEffect(() => {
     async function load() {
@@ -18,46 +29,58 @@ export default function Messages() {
       if (!user) return
       setUserId(user.id)
 
-      const { data } = await supabase
-        .from('messages')
-        .select('*, profiles(full_name, role)')
-        .eq('patient_id', user.id)
-        .order('created_at', { ascending: true })
+      // Look up the doctor to use as receiver_id when patient sends
+      const { data: doctor } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'doctor')
+        .limit(1)
+        .maybeSingle()
+      setDoctorId(doctor?.id ?? null)
 
-      setMessages(data || [])
+      await fetchMessages(user.id)
       setLoading(false)
     }
     load()
-
-    const channel = supabase
-      .channel('messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        setMessages(prev => [...prev, payload.new])
-      })
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
   }, [])
+
+  // Realtime: only trigger re-fetch for messages involving this user
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel(`messages-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new
+          if (msg.sender_id === userId || msg.receiver_id === userId) {
+            setMessages(prev => [...prev, msg])
+          }
+        }
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [userId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || sending) return
+    if (!newMessage.trim() || sending || !userId) return
     setSending(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+
     await supabase.from('messages').insert({
-      patient_id: userId,
-      sender_id: user.id,
-      sender_role: profile?.role || 'patient',
+      sender_id: userId,
+      receiver_id: doctorId,
+      sender_role: 'patient',
       body: newMessage.trim(),
     })
+
     setNewMessage('')
     setSending(false)
-    const { data } = await supabase.from('messages').select('*, profiles(full_name, role)').eq('patient_id', userId).order('created_at', { ascending: true })
-    setMessages(data || [])
+    await fetchMessages(userId)
   }
 
   return (
@@ -91,7 +114,7 @@ export default function Messages() {
               const isMe = msg.sender_id === userId
               const isDoctor = msg.sender_role === 'doctor'
               return (
-                <div key={i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>
+                <div key={msg.id || i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>
                   {/* Avatar */}
                   <div style={{
                     width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
@@ -105,16 +128,17 @@ export default function Messages() {
                   <div style={{
                     maxWidth: '72%', padding: '11px 15px',
                     borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    // Patient sent = teal, Doctor = light card
                     background: isMe ? '#00C2A8' : '#FAF7F2',
                     border: isMe ? 'none' : '1px solid #E5E5E5',
                   }}>
                     {!isMe && (
                       <div style={{ fontSize: '11px', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', fontWeight: 700, marginBottom: '4px' }}>
-                        {isDoctor ? 'Dr. Fernando' : msg.profiles?.full_name}
+                        {isDoctor ? 'Dr. Fernando' : (msg.profiles?.full_name || 'Patient')}
                       </div>
                     )}
-                    <p style={{ color: isMe ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>{msg.body}</p>
+                    <p style={{ color: isMe ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
+                      {msg.body}
+                    </p>
                     <div style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.6)' : 'rgba(42,42,42,0.35)', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -131,7 +155,7 @@ export default function Messages() {
           <input
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             placeholder={t.messagePlaceholder}
             style={{
               flex: 1, padding: '13px 16px', minHeight: '48px',
