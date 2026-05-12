@@ -131,7 +131,7 @@ export default function Messages() {
           ) : (
             messages.map((msg, i) => {
               const isMe = msg.sender_id === userId
-              const isDoctor = msg.sender_role === 'doctor'
+              const isDoctor = msg.sender_id === doctorId
               const isOptimistic = String(msg.id).startsWith('opt-')
               return (
                 <div key={msg.id || i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>

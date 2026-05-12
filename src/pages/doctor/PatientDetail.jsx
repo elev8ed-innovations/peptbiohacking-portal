@@ -139,7 +139,7 @@ export default function PatientDetail() {
                   <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif' }}>{t.noMessages}</p>
                 </div>
               ) : messages.map((msg, i) => {
-                const isDoctor = msg.sender_role === 'doctor'
+                const isDoctor = msg.sender_id === doctorId
                 return (
                   <div key={i} style={{ display: 'flex', flexDirection: isDoctor ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>
                     <div style={{
