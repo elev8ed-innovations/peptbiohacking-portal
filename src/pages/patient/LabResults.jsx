@@ -23,13 +23,37 @@ export default function LabResults() {
     load()
   }, [])
 
+  // Generate a signed URL from a storage path or legacy full URL
+  const getSignedUrl = async (fileUrl) => {
+    let path = fileUrl
+    // Legacy records stored the full public URL — extract the path
+    if (fileUrl && fileUrl.startsWith('http')) {
+      const match = fileUrl.match(/lab-uploads\/(.+)/)
+      if (!match) return fileUrl
+      path = match[1]
+    }
+    const { data } = await supabase.storage
+      .from('lab-uploads')
+      .createSignedUrl(path, 3600) // 1-hour expiry
+    return data?.signedUrl || fileUrl
+  }
+
   const fetchFiles = async (uid) => {
     const { data, error } = await supabase
       .from('lab_uploads')
       .select('*')
       .eq('patient_id', uid)
       .order('uploaded_at', { ascending: false })
-    if (!error) setFiles(data || [])
+    if (!error && data) {
+      // Resolve signed URLs for all files (bucket is private)
+      const withUrls = await Promise.all(
+        data.map(async (f) => ({
+          ...f,
+          displayUrl: await getSignedUrl(f.file_url),
+        }))
+      )
+      setFiles(withUrls)
+    }
   }
 
   const handleUpload = async (file) => {
@@ -40,7 +64,6 @@ export default function LabResults() {
     const ext = file.name.split('.').pop().toLowerCase()
     const storagePath = `${userId}/${Date.now()}.${ext}`
 
-    // Upload to lab-uploads bucket
     const { error: storageError } = await supabase.storage
       .from('lab-uploads')
       .upload(storagePath, file, { upsert: false })
@@ -51,16 +74,11 @@ export default function LabResults() {
       return
     }
 
-    // Get public URL from lab-uploads bucket
-    const { data: { publicUrl } } = supabase.storage
-      .from('lab-uploads')
-      .getPublicUrl(storagePath)
-
-    // Insert record into lab_uploads table
+    // Store the storage path (not public URL) so signed URLs work
     const { error: dbError } = await supabase.from('lab_uploads').insert({
       patient_id: userId,
       file_name: file.name,
-      file_url: publicUrl,
+      file_url: storagePath,
       file_type: file.type,
       uploaded_at: new Date().toISOString(),
     })
@@ -81,9 +99,8 @@ export default function LabResults() {
     if (file) handleUpload(file)
   }
 
-  const isPDF = (url) => {
-    const lower = url?.toLowerCase() ?? ''
-    return lower.includes('.pdf') || lower.endsWith('pdf')
+  const isPDF = (name) => {
+    return (name || '').toLowerCase().endsWith('.pdf')
   }
 
   return (
@@ -177,7 +194,7 @@ export default function LabResults() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
             {files.map((file, i) => (
-              <a key={i} href={file.file_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a key={i} href={file.displayUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <div style={{
                   background: '#fff', border: '1px solid #E5E5E5',
                   borderRadius: '12px', padding: '16px', cursor: 'pointer',
@@ -185,10 +202,10 @@ export default function LabResults() {
                   display: 'flex', flexDirection: 'column', gap: '10px',
                 }}>
                   <div style={{ height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {isPDF(file.file_url) ? (
+                    {isPDF(file.file_name) ? (
                       <span style={{ fontSize: '36px' }}>📄</span>
                     ) : (
-                      <img src={file.file_url} alt={file.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={file.displayUrl} alt={file.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     )}
                   </div>
                   <div>

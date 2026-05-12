@@ -9,12 +9,13 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [userId, setUserId] = useState(null)
   const [doctorId, setDoctorId] = useState(null)
   const bottomRef = useRef(null)
+  const userIdRef = useRef(null)
 
   const fetchMessages = async (uid) => {
-    // Fetch full dialogue: all messages where this user is sender OR receiver
     const { data } = await supabase
       .from('messages')
       .select('*, profiles!messages_sender_id_fkey(full_name, role)')
@@ -28,8 +29,8 @@ export default function Messages() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setUserId(user.id)
+      userIdRef.current = user.id
 
-      // Look up the doctor to use as receiver_id when patient sends
       const { data: doctor } = await supabase
         .from('profiles')
         .select('id')
@@ -44,7 +45,7 @@ export default function Messages() {
     load()
   }, [])
 
-  // Realtime: re-fetch on any insert involving this user (gets joined profiles data)
+  // Realtime: only for incoming doctor replies
   useEffect(() => {
     if (!userId) return
     const channel = supabase
@@ -54,8 +55,9 @@ export default function Messages() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new
-          if (msg.sender_id === userId || msg.receiver_id === userId) {
-            fetchMessages(userId)
+          // Only handle messages FROM someone else (doctor replies)
+          if (msg.receiver_id === userIdRef.current && msg.sender_id !== userIdRef.current) {
+            fetchMessages(userIdRef.current)
           }
         }
       )
@@ -70,28 +72,37 @@ export default function Messages() {
   const sendMessage = async () => {
     if (!newMessage.trim() || sending || !userId) return
     setSending(true)
+    setSendError('')
     const body = newMessage.trim()
     setNewMessage('')
 
-    // Optimistic append so the message appears instantly
-    const optimistic = {
-      id: `optimistic-${Date.now()}`,
+    // Optimistic append — message shows immediately
+    const optimisticId = `opt-${Date.now()}`
+    setMessages(prev => [...prev, {
+      id: optimisticId,
       sender_id: userId,
       receiver_id: doctorId,
       sender_role: 'patient',
       body,
       created_at: new Date().toISOString(),
-    }
-    setMessages(prev => [...prev, optimistic])
+    }])
 
-    await supabase.from('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       sender_id: userId,
       receiver_id: doctorId,
       sender_role: 'patient',
       body,
     })
 
-    // Realtime subscription will fire fetchMessages to replace optimistic entry
+    if (error) {
+      // Rollback optimistic entry and show error
+      setMessages(prev => prev.filter(m => m.id !== optimisticId))
+      setSendError(error.message)
+    } else {
+      // Replace optimistic entry with real DB row
+      await fetchMessages(userId)
+    }
+
     setSending(false)
   }
 
@@ -104,6 +115,12 @@ export default function Messages() {
           {t.messagesTitle}
         </h1>
         <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', marginBottom: '24px' }} />
+
+        {sendError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', color: '#dc2626', fontFamily: 'Outfit, sans-serif', fontSize: '13px' }}>
+            Failed to send: {sendError}
+          </div>
+        )}
 
         {/* Messages area */}
         <div style={{
@@ -125,9 +142,9 @@ export default function Messages() {
             messages.map((msg, i) => {
               const isMe = msg.sender_id === userId
               const isDoctor = msg.sender_role === 'doctor'
+              const isOptimistic = String(msg.id).startsWith('opt-')
               return (
                 <div key={msg.id || i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '10px', alignItems: 'flex-end' }}>
-                  {/* Avatar */}
                   <div style={{
                     width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
                     background: isDoctor ? '#C9A84C' : '#0A1628',
@@ -136,12 +153,12 @@ export default function Messages() {
                   }}>
                     {isDoctor ? 'Dr' : (msg.profiles?.full_name?.[0] || 'P')}
                   </div>
-                  {/* Bubble */}
                   <div style={{
                     maxWidth: '72%', padding: '11px 15px',
                     borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                     background: isMe ? '#00C2A8' : '#FAF7F2',
                     border: isMe ? 'none' : '1px solid #E5E5E5',
+                    opacity: isOptimistic ? 0.7 : 1,
                   }}>
                     {!isMe && (
                       <div style={{ fontSize: '11px', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', fontWeight: 700, marginBottom: '4px' }}>
@@ -153,6 +170,7 @@ export default function Messages() {
                     </p>
                     <div style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.6)' : 'rgba(42,42,42,0.35)', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {isOptimistic && ' · sending...'}
                     </div>
                   </div>
                 </div>
