@@ -18,17 +18,6 @@ export default function PatientDetail() {
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
 
-  const getSignedUrl = async (fileUrl) => {
-    let path = fileUrl
-    if (fileUrl && fileUrl.startsWith('http')) {
-      const match = fileUrl.match(/lab-uploads\/(.+)/)
-      if (!match) return fileUrl
-      path = match[1]
-    }
-    const { data } = await supabase.storage.from('lab-uploads').createSignedUrl(path, 3600)
-    return data?.signedUrl || fileUrl
-  }
-
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -39,16 +28,24 @@ export default function PatientDetail() {
         supabase.from('messages').select('*')
           .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
           .order('created_at', { ascending: true }),
-        supabase.from('lab_uploads').select('*').eq('patient_id', id).order('uploaded_at', { ascending: false }),
+        supabase.storage.from('lab-uploads').list(id, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } }),
         supabase.from('consultations').select('*').eq('patient_id', id).order('created_at', { ascending: false }),
       ])
 
       setPatient(prof)
       setMessages(msgs || [])
 
-      // Generate signed URLs for private bucket
+      // Generate signed URLs from storage list results
       const labsWithUrls = await Promise.all(
-        (labData || []).map(async (f) => ({ ...f, displayUrl: await getSignedUrl(f.file_url) }))
+        (labData || []).map(async (f) => {
+          const path = `${id}/${f.name}`
+          const { data: signed } = await supabase.storage.from('lab-uploads').createSignedUrl(path, 3600)
+          return {
+            file_name: f.name,
+            uploaded_at: f.created_at,
+            displayUrl: signed?.signedUrl || '',
+          }
+        })
       )
       setLabs(labsWithUrls)
       setConsults(consultData || [])
