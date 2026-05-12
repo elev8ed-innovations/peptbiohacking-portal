@@ -202,8 +202,11 @@ export default function PatientDetail() {
                 {labs.map((file, i) => (
                   <a key={i} href={file.displayUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                     <div style={{ background: '#FAF7F2', border: '1px solid #E5E5E5', borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
-                      <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', marginBottom: '8px' }}>
-                        {file.file_name?.endsWith('.pdf') ? '📄' : '🖼'}
+                      <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', background: '#F5F5F0' }}>
+                        {file.file_name?.toLowerCase().endsWith('.pdf')
+                          ? <span style={{ fontSize: '32px' }}>📄</span>
+                          : <img src={file.displayUrl} alt={file.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        }
                       </div>
                       <p style={{ color: '#0A1628', fontFamily: 'Outfit, sans-serif', fontSize: '12px', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{file.file_name}</p>
                       <p style={{ color: '#2A2A2A', opacity: 0.4, fontSize: '11px', fontFamily: 'Outfit, sans-serif', margin: 0 }}>{new Date(file.uploaded_at).toLocaleDateString()}</p>
