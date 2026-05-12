@@ -11,7 +11,7 @@ export default function Messages() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState('')
   const [userId, setUserId] = useState(null)
-  const [doctorId, setDoctorId] = useState(null)
+  const doctorId = '63751430-a7e8-442a-9dd6-3f1078035bdc'
   const bottomRef = useRef(null)
   const userIdRef = useRef(null)
 
@@ -30,14 +30,6 @@ export default function Messages() {
       if (!user) return
       setUserId(user.id)
       userIdRef.current = user.id
-
-      const { data: doctor } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'doctor')
-        .limit(1)
-        .maybeSingle()
-      setDoctorId(doctor?.id ?? null)
 
       await fetchMessages(user.id)
       setLoading(false)
