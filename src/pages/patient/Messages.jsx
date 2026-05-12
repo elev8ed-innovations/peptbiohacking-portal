@@ -82,7 +82,6 @@ export default function Messages() {
       id: optimisticId,
       sender_id: userId,
       receiver_id: doctorId,
-      sender_role: 'patient',
       content: body,
       created_at: new Date().toISOString(),
     }])
@@ -90,7 +89,6 @@ export default function Messages() {
     const { error } = await supabase.from('messages').insert({
       sender_id: userId,
       receiver_id: doctorId,
-      sender_role: 'patient',
       content: body,
     })
 

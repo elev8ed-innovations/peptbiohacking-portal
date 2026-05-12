@@ -66,7 +66,6 @@ export default function PatientDetail() {
     await supabase.from('messages').insert({
       sender_id: doctorId,
       receiver_id: id,
-      sender_role: 'doctor',
       content: newMessage.trim(),
     })
     setNewMessage('')
