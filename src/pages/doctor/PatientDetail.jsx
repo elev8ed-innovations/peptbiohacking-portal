@@ -36,7 +36,7 @@ export default function PatientDetail() {
 
       const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
-        supabase.from('messages').select('*, profiles!messages_sender_id_fkey(full_name, role)')
+        supabase.from('messages').select('*')
           .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
           .order('created_at', { ascending: true }),
         supabase.from('lab_uploads').select('*').eq('patient_id', id).order('uploaded_at', { ascending: false }),
@@ -70,11 +70,11 @@ export default function PatientDetail() {
     })
     setNewMessage('')
     setSending(false)
-    const { data } = await supabase.from('messages')
-      .select('*, profiles!messages_sender_id_fkey(full_name, role)')
+    const { data, error } = await supabase.from('messages')
+      .select('*')
       .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
       .order('created_at', { ascending: true })
-    setMessages(data || [])
+    if (!error) setMessages(data || [])
   }
 
   const tabs = ['messages', 'labs', 'consultations']
