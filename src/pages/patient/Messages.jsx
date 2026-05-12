@@ -83,7 +83,7 @@ export default function Messages() {
       sender_id: userId,
       receiver_id: doctorId,
       sender_role: 'patient',
-      body,
+      content: body,
       created_at: new Date().toISOString(),
     }])
 
@@ -91,7 +91,7 @@ export default function Messages() {
       sender_id: userId,
       receiver_id: doctorId,
       sender_role: 'patient',
-      body,
+      content: body,
     })
 
     if (error) {
@@ -166,7 +166,7 @@ export default function Messages() {
                       </div>
                     )}
                     <p style={{ color: isMe ? '#fff' : '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
-                      {msg.body}
+                      {msg.content}
                     </p>
                     <div style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.6)' : 'rgba(42,42,42,0.35)', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
