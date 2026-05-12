@@ -23,37 +23,26 @@ export default function LabResults() {
     load()
   }, [])
 
-  // Generate a signed URL from a storage path or legacy full URL
-  const getSignedUrl = async (fileUrl) => {
-    let path = fileUrl
-    // Legacy records stored the full public URL — extract the path
-    if (fileUrl && fileUrl.startsWith('http')) {
-      const match = fileUrl.match(/lab-uploads\/(.+)/)
-      if (!match) return fileUrl
-      path = match[1]
-    }
-    const { data } = await supabase.storage
-      .from('lab-uploads')
-      .createSignedUrl(path, 3600) // 1-hour expiry
-    return data?.signedUrl || fileUrl
-  }
-
   const fetchFiles = async (uid) => {
-    const { data, error } = await supabase
-      .from('lab_uploads')
-      .select('*')
-      .eq('patient_id', uid)
-      .order('uploaded_at', { ascending: false })
-    if (!error && data) {
-      // Resolve signed URLs for all files (bucket is private)
-      const withUrls = await Promise.all(
-        data.map(async (f) => ({
-          ...f,
-          displayUrl: await getSignedUrl(f.file_url),
-        }))
-      )
-      setFiles(withUrls)
-    }
+    const { data, error } = await supabase.storage
+      .from('lab-uploads')
+      .list(uid, { sortBy: { column: 'created_at', order: 'desc' } })
+    if (error || !data) return
+
+    const withUrls = await Promise.all(
+      data.map(async (f) => {
+        const path = `${uid}/${f.name}`
+        const { data: signed } = await supabase.storage
+          .from('lab-uploads')
+          .createSignedUrl(path, 3600)
+        return {
+          file_name: f.name,
+          uploaded_at: f.created_at,
+          displayUrl: signed?.signedUrl || '',
+        }
+      })
+    )
+    setFiles(withUrls)
   }
 
   const handleUpload = async (file) => {
@@ -74,20 +63,7 @@ export default function LabResults() {
       return
     }
 
-    // Store the storage path (not public URL) so signed URLs work
-    const { error: dbError } = await supabase.from('lab_uploads').insert({
-      patient_id: userId,
-      file_name: file.name,
-      file_url: storagePath,
-      file_type: file.type,
-      uploaded_at: new Date().toISOString(),
-    })
-
-    if (dbError) {
-      setUploadError(dbError.message)
-    } else {
-      await fetchFiles(userId)
-    }
+    await fetchFiles(userId)
 
     setUploading(false)
   }
