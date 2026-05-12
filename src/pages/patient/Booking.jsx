@@ -2,7 +2,7 @@ import { InlineWidget } from 'react-calendly'
 import Navbar from '../../components/Navbar'
 import { useLang } from '../../context/LanguageContext'
 
-const CALENDLY_URL = import.meta.env.VITE_CALENDLY_URL || 'https://calendly.com/peptbiohacking/consulta-inicial'
+const CALENDLY_URL = import.meta.env.VITE_CALENDLY_URL || 'https://calendly.com/admin-peptbiohacking/consulta-dr-v'
 
 export default function Booking() {
   const { t } = useLang()

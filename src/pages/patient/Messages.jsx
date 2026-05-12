@@ -44,7 +44,7 @@ export default function Messages() {
     load()
   }, [])
 
-  // Realtime: only trigger re-fetch for messages involving this user
+  // Realtime: re-fetch on any insert involving this user (gets joined profiles data)
   useEffect(() => {
     if (!userId) return
     const channel = supabase
@@ -55,7 +55,7 @@ export default function Messages() {
         (payload) => {
           const msg = payload.new
           if (msg.sender_id === userId || msg.receiver_id === userId) {
-            setMessages(prev => [...prev, msg])
+            fetchMessages(userId)
           }
         }
       )
@@ -70,17 +70,29 @@ export default function Messages() {
   const sendMessage = async () => {
     if (!newMessage.trim() || sending || !userId) return
     setSending(true)
+    const body = newMessage.trim()
+    setNewMessage('')
+
+    // Optimistic append so the message appears instantly
+    const optimistic = {
+      id: `optimistic-${Date.now()}`,
+      sender_id: userId,
+      receiver_id: doctorId,
+      sender_role: 'patient',
+      body,
+      created_at: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, optimistic])
 
     await supabase.from('messages').insert({
       sender_id: userId,
       receiver_id: doctorId,
       sender_role: 'patient',
-      body: newMessage.trim(),
+      body,
     })
 
-    setNewMessage('')
+    // Realtime subscription will fire fetchMessages to replace optimistic entry
     setSending(false)
-    await fetchMessages(userId)
   }
 
   return (
