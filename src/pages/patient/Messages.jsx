@@ -16,12 +16,12 @@ export default function Messages() {
   const userIdRef = useRef(null)
 
   const fetchMessages = async (uid) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
-      .select('*, profiles!messages_sender_id_fkey(full_name, role)')
+      .select('*')
       .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
       .order('created_at', { ascending: true })
-    setMessages(data || [])
+    if (!error) setMessages(data || [])
   }
 
   useEffect(() => {
