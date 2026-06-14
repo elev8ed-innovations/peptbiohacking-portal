@@ -1,7 +1,7 @@
 [[redirects]]
   from = "/inventario"
-  to = "/inventario.html"
-  status = 200
+  to = "https://peptbiohacking.com/inventario"
+  status = 301
 
 [[redirects]]
   from = "/*"
