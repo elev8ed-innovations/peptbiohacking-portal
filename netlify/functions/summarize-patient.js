@@ -26,7 +26,7 @@ exports.handler = async function(event) {
         'Authorization': 'Bearer ' + OR_KEY
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-haiku',
+        model: 'google/gemma-4-26b-a4b-it:free',
         max_tokens: 1000,
         messages: [
           { role: 'system', content: 'You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico. Summarize the patient current status clearly and concisely for the doctor. Include: 1. Current wellness trend (improving/stable/declining) 2. Key concerns or highlights from check-ins 3. Protocol notes 4. Recommended follow-up actions. Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.' },
