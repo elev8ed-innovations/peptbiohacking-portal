@@ -1,7 +1,7 @@
 // Summarize patient data for Dr. Fernando's dashboard
 // API key stays server-side — secure
 
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const OR_KEY = process.env.OPENROUTER_API_KEY;
 
 exports.handler = async function(event) {
   if (event.httpMethod !== 'POST') {
@@ -19,32 +19,33 @@ exports.handler = async function(event) {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01'
+        'Authorization': 'Bearer ' + OR_KEY
       },
       body: JSON.stringify({
-        model: 'claude-3-opus-20240229',
+        model: 'anthropic/claude-3.5-sonnet',
         max_tokens: 1000,
-        system: 'You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico. Summarize the patient current status clearly and concisely for the doctor. Include: 1. Current wellness trend (improving/stable/declining) 2. Key concerns or highlights from check-ins 3. Protocol notes 4. Recommended follow-up actions. Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.',
-        messages: [{ role: 'user', content: 'Please summarize this patient status:\n\n' + patientContext }]
+        messages: [
+          { role: 'system', content: 'You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico. Summarize the patient current status clearly and concisely for the doctor. Include: 1. Current wellness trend (improving/stable/declining) 2. Key concerns or highlights from check-ins 3. Protocol notes 4. Recommended follow-up actions. Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.' },
+          { role: 'user', content: 'Please summarize this patient status:\n\n' + patientContext }
+        ]
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Anthropic API error:', response.status, JSON.stringify(data));
+      console.error('AI API error:', response.status, JSON.stringify(data));
       return {
         statusCode: 502,
         body: JSON.stringify({ error: 'AI service error', detail: data })
       };
     }
 
-    const summary = data.content?.[0]?.text || 'Unable to generate summary.';
+    const summary = data.choices?.[0]?.message?.content || 'Unable to generate summary.';
 
     return {
       statusCode: 200,
