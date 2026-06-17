@@ -1,5 +1,5 @@
 // Summarize patient data for Dr. Fernando's dashboard
-// Called from the browser — API key stays server-side
+// API key stays server-side — secure
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -29,18 +29,21 @@ exports.handler = async function(event) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: `You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico.
-Summarize the patient's current status clearly and concisely for the doctor. Include:
-1. Current wellness trend (improving/stable/declining)
-2. Key concerns or highlights from check-ins
-3. Protocol notes
-4. Recommended follow-up actions
-Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.`,
+        system: 'You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico. Summarize the patient current status clearly and concisely for the doctor. Include: 1. Current wellness trend (improving/stable/declining) 2. Key concerns or highlights from check-ins 3. Protocol notes 4. Recommended follow-up actions. Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.',
         messages: [{ role: 'user', content: 'Please summarize this patient status:\n\n' + patientContext }]
       })
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Anthropic API error:', response.status, JSON.stringify(data));
+      return {
+        statusCode: 502,
+        body: JSON.stringify({ error: 'AI service error', detail: data })
+      };
+    }
+
     const summary = data.content?.[0]?.text || 'Unable to generate summary.';
 
     return {
