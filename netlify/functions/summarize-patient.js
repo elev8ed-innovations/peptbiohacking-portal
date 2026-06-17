@@ -27,7 +27,7 @@ exports.handler = async function(event) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         system: 'You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico. Summarize the patient current status clearly and concisely for the doctor. Include: 1. Current wellness trend (improving/stable/declining) 2. Key concerns or highlights from check-ins 3. Protocol notes 4. Recommended follow-up actions. Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.',
         messages: [{ role: 'user', content: 'Please summarize this patient status:\n\n' + patientContext }]
