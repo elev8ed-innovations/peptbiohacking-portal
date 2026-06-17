@@ -68,27 +68,16 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
     `.trim()
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/.netlify/functions/summarize-patient', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are a clinical assistant for Dr. Fernando Valenzuela, a physician specializing in peptide therapy and regenerative medicine at PeptBiohacking in Mexico.
-Summarize the patient's current status clearly and concisely for the doctor. Include:
-1. Current wellness trend (improving/stable/declining)
-2. Key concerns or highlights from check-ins
-3. Protocol notes
-4. Recommended follow-up actions
-Be clinical, concise, and bilingual (Spanish preferred, English acceptable). Max 200 words.`,
-          messages: [{ role: 'user', content: `Please summarize this patient's status:\n\n${patientContext}` }]
-        })
-      })
-      const data = await response.json()
-      const summary = data.content?.[0]?.text || 'Unable to generate summary.'
-      setSummaries(s => ({ ...s, [patient.id]: summary }))
+        body: JSON.stringify({ patientContext, patientName: patient.full_name })
+      });
+      const data = await response.json();
+      const summary = data.summary || 'Unable to generate summary.';
+      setSummaries(s => ({ ...s, [patient.id]: summary }));
     } catch (e) {
-      setSummaries(s => ({ ...s, [patient.id]: 'Error generating summary. Please try again.' }))
+      setSummaries(s => ({ ...s, [patient.id]: 'Error generating summary. Please try again.' }));
     }
 
     setGenerating(g => ({ ...g, [patient.id]: false }))
