@@ -29,6 +29,8 @@ export default function NewConsultation() {
   const [protocol, setProtocol] = useState([{ name: '', dose: '', frequency: '' }])
   const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [doctorId, setDoctorId] = useState(null)
 
   const appointmentId = searchParams.get('appointment_id')
@@ -72,7 +74,10 @@ export default function NewConsultation() {
   const save = async () => {
     if (!selectedPatient || !chiefComplaint) return
     setSaving(true)
-    await supabase.from('consultations').insert({
+    setSaveError('')
+    setSaveSuccess(false)
+
+    const { error } = await supabase.from('consultations').insert({
       doctor_id: doctorId,
       patient_id: selectedPatient,
       chief_complaint: chiefComplaint,
@@ -81,7 +86,17 @@ export default function NewConsultation() {
       photos,
       appointment_id: appointmentId || null,
     })
-    navigate('/doctor/dashboard')
+
+    setSaving(false)
+
+    if (error) {
+      console.error('Save consultation error:', error)
+      setSaveError(error.message || 'Error al guardar la consulta. Intente de nuevo.')
+      return
+    }
+
+    setSaveSuccess(true)
+    setTimeout(() => navigate('/doctor/dashboard'), 800)
   }
 
   return (
@@ -163,6 +178,26 @@ export default function NewConsultation() {
               </div>
             )}
           </div>
+
+          {saveError && (
+            <div style={{
+              padding: '12px 16px', background: 'rgba(200,50,50,0.08)',
+              border: '1px solid rgba(200,50,50,0.25)', borderRadius: '10px',
+              color: '#CC3333', fontFamily: 'Outfit, sans-serif', fontSize: '13px',
+            }}>
+              ❌ {saveError}
+            </div>
+          )}
+
+          {saveSuccess && (
+            <div style={{
+              padding: '12px 16px', background: 'rgba(0,194,168,0.08)',
+              border: '1px solid rgba(0,194,168,0.25)', borderRadius: '10px',
+              color: '#00A891', fontFamily: 'Outfit, sans-serif', fontSize: '13px',
+            }}>
+              ✅ Consulta guardada con éxito. Redirigiendo...
+            </div>
+          )}
 
           <button
             onClick={save}
