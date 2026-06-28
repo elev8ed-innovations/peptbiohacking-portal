@@ -58,7 +58,7 @@ a{color:var(--teal);text-decoration:none}
 .toggle-body.open{max-height:800px}
 .toggle-inner{padding:0 18px 18px}
 
-/* ── FORM UTILITIES ── */
+/* ── ADD PRODUCT FORM ── */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 @media(max-width:500px){.form-grid{grid-template-columns:1fr}}
 .fg{display:flex;flex-direction:column;gap:4px}
@@ -181,14 +181,48 @@ td.price{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11p
   <div class="head">
     <div>
       <h2><b>Inventario</b> en vivo</h2>
-      <div class="badge">📊 Google Sheets · En vivo</div>
+      <div class="badge">Sync via Airtable · Excel</div>
     </div>
     <div class="head-actions">
       <button class="enter-btn" onclick="loadInventory()">🔄 Actualizar</button>
     </div>
   </div>
 
-  <!-- ── TICKET TOGGLE ── -->
+  <!-- ── ADD PRODUCT TOGGLE ── -->
+  <div class="toggle-section" id="addProductSection">
+    <div class="toggle-head" onclick="togglePanel('addProduct')">
+      <span class="lbl"><span class="ico">➕</span> Agregar producto</span>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="toggle-body" id="addProductBody">
+      <div class="toggle-inner">
+        <div class="form-grid">
+          <div class="fg">
+            <label>SKU *</label>
+            <input id="newSku" placeholder="ej: bpc-157-10" oninput="clearFormMsg('add')">
+          </div>
+          <div class="fg">
+            <label>Producto *</label>
+            <input id="newName" placeholder="BPC-157 10mg" oninput="clearFormMsg('add')">
+          </div>
+          <div class="fg">
+            <label>Stock inicial</label>
+            <input id="newStock" type="number" min="0" placeholder="0">
+          </div>
+          <div class="fg">
+            <label>Precio MXN</label>
+            <input id="newPrice" type="number" min="0" step="100" placeholder="0">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="enter-btn" id="addBtn" onclick="addProduct()">➕ Agregar</button>
+        </div>
+        <div class="form-msg" id="addMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FIX IT TICKET TOGGLE ── -->
   <div class="toggle-section" id="ticketSection">
     <div class="toggle-head" onclick="togglePanel('ticket')">
       <span class="lbl"><span class="ico">🛠️</span> Reportar problema / Recomendar</span>
@@ -269,7 +303,8 @@ td.price{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11p
 
 <script>
 const PASSWORD="PEPBIO2026";
-const API_URL="REEMPLAZAR_CON_URL_DEL_WEBHOOK";
+const API_URL="https://myymemctdxwizhmwjbyk.supabase.co/functions/v1/get-inventory";
+const ADD_URL="https://myymemctdxwizhmwjbyk.supabase.co/functions/v1/add-product";
 const TICKET_URL="https://myymemctdxwizhmwjbyk.supabase.co/functions/v1/submit-ticket";
 let inventoryData=[],currentFilter="all";
 
@@ -291,11 +326,46 @@ function togglePanel(id){
   head.classList.toggle('open');
 }
 
-/* ── TICKETS ── */
+/* ── ADD PRODUCT ── */
 function clearFormMsg(type){
   var el=document.getElementById(type+'Msg');
-  if(el){el.style.display='none';}
+  el.className=(type==='add'?'form-msg':'ticket-msg');
+  el.style.display='none';
 }
+function addProduct(){
+  var sku=document.getElementById('newSku').value.trim();
+  var name=document.getElementById('newName').value.trim();
+  var stock=document.getElementById('newStock').value;
+  var price=document.getElementById('newPrice').value;
+  var btn=document.getElementById('addBtn');
+  var msg=document.getElementById('addMsg');
+
+  if(!sku||!name){msg.className='form-msg err';msg.textContent='SKU y nombre son obligatorios';msg.style.display='block';return;}
+
+  btn.disabled=true;btn.textContent='Agregando...';
+  msg.className='form-msg';msg.style.display='none';
+
+  fetch(ADD_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({passcode:PASSWORD,sku:sku,product:name,stock:Number(stock)||0,price:Number(price)||0})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.success){
+      msg.className='form-msg ok';msg.textContent='✅ '+d.message;msg.style.display='block';
+      document.getElementById('newSku').value='';document.getElementById('newName').value='';
+      document.getElementById('newStock').value='';document.getElementById('newPrice').value='';
+      loadInventory();
+    }else{
+      msg.className='form-msg err';msg.textContent='❌ '+d.error;msg.style.display='block';
+    }
+    btn.disabled=false;btn.textContent='➕ Agregar';
+  }).catch(function(e){
+    msg.className='form-msg err';msg.textContent='❌ Error de conexión: '+e.message;msg.style.display='block';
+    btn.disabled=false;btn.textContent='➕ Agregar';
+  });
+}
+
+/* ── TICKETS ── */
 function submitTicket(){
   var title=document.getElementById('ticketTitle').value.trim();
   var desc=document.getElementById('ticketDesc').value.trim();

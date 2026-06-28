@@ -1,21 +1,26 @@
-[[redirects]]
-  from = "/inventario"
-  to = "https://peptbiohacking.com/inventario"
-  status = 301
-
-[[redirects]]
-  from = "/calculadora"
-  to = "https://peptbiohacking.com/calculadora"
-  status = 301
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Netlify config — PeptBiohacking Portal (peptbiohacking.mx)
+# Deploy Previews: auto-built for every branch pushed to GitHub
+# Preview URL pattern: https://{branch-name}--pept-app.netlify.app
 
 [build]
-  command = "npm install && npm run build"
+  command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
-[functions]
-  directory = "netlify/functions"
+# Production
+[context.production]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Deploy Preview: every branch push auto-builds with full env
+[context.deploy-preview]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Branch Deploy: same config
+[context.branch-deploy]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
