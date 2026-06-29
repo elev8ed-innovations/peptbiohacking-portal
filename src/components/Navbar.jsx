@@ -35,12 +35,14 @@ export default function Navbar({ role }) {
     { path: '/patient/labs', label: t.labs },
     { path: '/patient/booking', label: t.booking },
     { path: '/patient/light-health', label: t.lightHealth },
+    { path: '/calculator', label: '🧮 ' + t.calculator || 'Calculator' },
   ]
 
   const doctorLinks = [
     { path: '/doctor/dashboard', label: t.patients },
     { path: '/doctor/new-consultation', label: t.newConsult },
     { path: '/doctor/inventario', label: '🛒 Inventario' },
+    { path: '/calculator', label: '🧮 ' + t.calculator || 'Calculator' },
   ]
 
   const links = role === 'doctor' ? doctorLinks : patientLinks

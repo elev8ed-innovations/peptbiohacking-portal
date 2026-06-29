@@ -13,6 +13,7 @@ import DoctorDashboard from './pages/doctor/Dashboard'
 import NewConsultation from './pages/doctor/NewConsultation'
 import PatientDetail from './pages/doctor/PatientDetail'
 import Inventario from './pages/doctor/Inventario'
+import Calculadora from './pages/shared/Calculadora'
 import EmailConfirmed from './pages/EmailConfirmed'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/doctor/new-consultation" element={<NewConsultation />} />
           <Route path="/doctor/inventario" element={<Inventario />} />
           <Route path="/doctor/patient/:id" element={<PatientDetail />} />
+          <Route path="/calculator" element={<Calculadora />} />
           <Route path="/confirmed" element={<EmailConfirmed />} />
         </Routes>
       </BrowserRouter>

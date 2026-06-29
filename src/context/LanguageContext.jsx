@@ -15,6 +15,7 @@ export const translations = {
     logout: 'Logout',
     patients: 'Patients',
     newConsult: 'New Consultation',
+    calculator: 'Calculator',
     // Auth
     welcome: 'Welcome',
     login: 'Sign In',
@@ -91,6 +92,7 @@ export const translations = {
     logout: 'Salir',
     patients: 'Pacientes',
     newConsult: 'Nueva Consulta',
+    calculator: 'Calculadora',
     // Auth
     welcome: 'Bienvenido',
     login: 'Iniciar Sesión',
