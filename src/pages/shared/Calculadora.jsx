@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import { supabase } from '../../lib/supabase'
 
 const T = {
   es: {
@@ -92,6 +93,8 @@ export default function Calculadora() {
   const [showGate, setShowGate] = useState(true)
   const [agreed, setAgreed] = useState(false)
 
+  const [userRole, setUserRole] = useState(null)
+
   const [vialMg, setVialMg] = useState(10)
   const [vialCustom, setVialCustom] = useState('')
   const [showCustomMg, setShowCustomMg] = useState(false)
@@ -105,6 +108,14 @@ export default function Calculadora() {
 
   // Load params from URL on mount
   useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (data) setUserRole(data.role)
+      }
+    }
+    loadUser()
     const mg = searchParams.get('mg')
     const bac = searchParams.get('bac')
     const dose = searchParams.get('dose')
@@ -325,7 +336,7 @@ export default function Calculadora() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A1628', fontFamily: 'Outfit, sans-serif' }}>
-      <Navbar role={null} />
+      <Navbar role={userRole} />
       <div style={{ position: 'fixed', top: '70px', right: '20px', zIndex: 50 }}>
         <button onClick={tgl} style={{
           background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px',
