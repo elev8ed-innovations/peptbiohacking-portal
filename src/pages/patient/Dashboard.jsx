@@ -25,6 +25,8 @@ export default function PatientDashboard() {
   const [profile, setProfile] = useState(null)
   const [consultations, setConsultations] = useState([])
   const [checkins, setCheckins] = useState([])
+  const [bodyMetrics, setBodyMetrics] = useState([])
+  const [metricsLoading, setMetricsLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showIntro, setShowIntro] = useState(false)
   const [showWaiver, setShowWaiver] = useState(false)
@@ -63,6 +65,13 @@ export default function PatientDashboard() {
 
       setConsultations(consults || [])
       setCheckins(chks || [])
+      const { data: bm } = await supabase
+        .from("body_metrics")
+        .select("*")
+        .eq("patient_id", user.id)
+        .order("recorded_at", { ascending: false })
+      setBodyMetrics(bm || [])
+      setMetricsLoading(false)
       setLoading(false)
 
       if (!prof?.has_signed_waiver) {
@@ -196,6 +205,125 @@ export default function PatientDashboard() {
             </div>
           </div>
         </div>
+
+        {/* BODY METRICS SECTION */}
+        {!metricsLoading && (
+          <div style={{ marginTop: '36px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', marginBottom: '8px' }}>{'Dashboard'}</p>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '28px', color: '#0A1628', margin: '0 0 4px' }}>
+              {'Mi Progreso'}
+            </h2>
+            <div style={{ width: '40px', height: '2px', background: 'linear-gradient(90deg, #00C2A8, #C9A84C)', marginBottom: '20px' }} />
+
+            {bodyMetrics.length === 0 ? (
+              <div style={{ background: '#fff', borderRadius: '14px', padding: '40px 20px', marginBottom: '20px', border: '1px solid #E5E5E5', textAlign: 'center' }}>
+                <span style={{ fontSize: '36px' }}>📏</span>
+                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#0A1628', margin: '12px 0 6px' }}>
+                  {'Aun sin mediciones'}
+                </h3>
+                <p style={{ color: '#2A2A2A', opacity: 0.45, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0, maxWidth: '320px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  {'Tu medico registrara tus metricas corporales durante tu proxima consulta. Vuelve a revisar despues de tu cita.'}
+                </p>
+              </div>
+            ) : (<>
+            {/* Trend Chart */}
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '20px', border: '1px solid #E5E5E5' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0A1628', marginBottom: '12px' }}>{'Peso — Ultimos 30 dias'}</div>
+              <svg viewBox="0 0 300 80" preserveAspectRatio="none" style={{ width: '100%', height: '100px' }}>
+                {(() => {
+                  const weights = [...bodyMetrics].reverse().filter(r => r.weight_kg != null).slice(-10).map(r => r.weight_kg)
+                  if (weights.length < 2) return null
+                  const min = Math.min(...weights), max = Math.max(...weights), range = max - min || 1
+                  const points = weights.map((w, i) => {
+                    const x = (i / (weights.length - 1)) * 280 + 10
+                    const y = 70 - ((w - min) / range) * 60
+                    return x + ',' + y
+                  }).join(' ')
+                  return (<>
+                    <polyline points={points} fill="none" stroke="#2A7C6F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx={points.split(' ').pop().split(',')[0]} cy={points.split(' ').pop().split(',')[1]} r="4" fill="#2A7C6F" />
+                  </>)
+                })()}
+              </svg>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span style={{ fontSize: '10px', color: 'rgba(26,42,42,.4)' }}>{'Hace 30 dias'}</span>
+                <span style={{ fontSize: '10px', color: 'rgba(26,42,42,.4)' }}>{'Hoy'}</span>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              {[
+                { key: 'weight_kg', label: 'Peso', unit: 'kg', good: true },
+                { key: 'body_fat_pct', label: 'Grasa Corporal', unit: '%', good: true },
+                { key: 'bmi', label: 'IMC', unit: '', isBmi: true },
+                { key: 'muscle_kg', label: 'Masa Muscular', unit: 'kg', good: false },
+              ].map(m => {
+                const val = bodyMetrics[0]?.[m.key]
+                const prev = bodyMetrics[1]?.[m.key]
+                const diff = (val != null && prev != null) ? (val - prev) : null
+                const isBmiGood = m.isBmi && val != null && val >= 18.5 && val <= 24.9
+                return (
+                  <div key={m.key} style={{ background: '#fff', borderRadius: '10px', padding: '16px', border: '1px solid #E5E5E5' }}>
+                    <div style={{ fontSize: '11px', color: 'rgba(26,42,42,.4)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: '4px' }}>{m.label}</div>
+                    <div style={{ fontSize: '22px', fontWeight: 700, color: '#0A1628' }}>
+                      {val != null ? val : '--'}
+                      {m.unit && <span style={{ fontSize: '14px', fontWeight: 400, color: 'rgba(26,42,42,.4)', marginLeft: '2px' }}>{m.unit}</span>}
+                    </div>
+                    {diff != null && Math.abs(diff) >= 0.05 && (
+                      <div style={{ fontSize: '12px', marginTop: '2px', color: (m.good ? diff < 0 : diff > 0) ? '#2A7C6F' : '#C0392B' }}>
+                        {diff > 0 ? '▲' : '▼'} {Math.abs(diff).toFixed(1)}{m.unit} {m.good ? 'este mes' : ''}
+                      </div>
+                    )}
+                    {isBmiGood && <div style={{ fontSize: '12px', marginTop: '2px', color: '#2A7C6F' }}>{'Rango saludable'}</div>}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* History Table */}
+            {bodyMetrics.length > 1 && (
+              <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E5E5E5', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #F0EFEA', fontFamily: 'Cormorant Garamond, serif', fontSize: '18px', color: '#0A1628' }}>
+                  {'Historial de mediciones'}
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #E5E5E5' }}>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'Fecha'}</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'Peso'}</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'Grasa'}</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'IMC'}</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'Musculo'}</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: 'rgba(26,42,42,.4)', fontWeight: 500 }}>{'Cintura'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bodyMetrics.slice(0, 10).map((m, i) => (
+                        <tr key={m.id} style={{ borderBottom: i < Math.min(bodyMetrics.length, 10) - 1 ? '1px solid #F5F4F0' : 'none' }}>
+                          <td style={{ padding: '8px 14px', color: '#0A1628', fontWeight: 500 }}>{new Date(m.recorded_at).toLocaleDateString()}</td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{m.weight_kg ?? '--'}</td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{m.body_fat_pct != null ? m.body_fat_pct + '%' : '--'}</td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{m.bmi ?? '--'}</td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{m.muscle_kg ?? '--'}</td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{m.waist_cm ?? '--'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+              <p style={{ fontSize: '11px', color: 'rgba(26,42,42,.3)', fontFamily: 'Outfit, sans-serif' }}>
+                {'Solo lectura — Tus metricas son registradas por tu medico'}
+              </p>
+            </div>
+            </>)}
+          </div>
+        )}
       </div>
     </div>
   )

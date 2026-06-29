@@ -40,6 +40,7 @@ export default function Navbar({ role }) {
   const doctorLinks = [
     { path: '/doctor/dashboard', label: t.patients },
     { path: '/doctor/new-consultation', label: t.newConsult },
+    { path: '/doctor/inventario', label: '🛒 Inventario' },
   ]
 
   const links = role === 'doctor' ? doctorLinks : patientLinks

@@ -233,19 +233,36 @@ td.price{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11p
         <div class="ticket-form">
           <div class="fg">
             <label>Título *</label>
-            <input id="ticketTitle" placeholder="Ej: La galería de productos no carga en iPhone" oninput="clearFormMsg('ticket')">
+            <input id="ticketTitle" placeholder="Ej: La galería de productos no carga en iPhone" oninput="clearFormMsg('ticket')" style="padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--ice);font-size:13px;outline:none;font-family:'Outfit',sans-serif;width:100%">
           </div>
           <div class="fg">
             <label>Descripción (opcional)</label>
-            <textarea id="ticketDesc" placeholder="Describe el problema o recomendación..."></textarea>
+            <textarea id="ticketDesc" placeholder="Describe el problema o recomendación..." style="padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--ice);font-size:13px;outline:none;font-family:'Outfit',sans-serif;resize:vertical;min-height:50px;width:100%"></textarea>
+          </div>
+          <!-- Price change fields -->
+          <div class="fg">
+            <label>Producto (para cambio de precio)</label>
+            <select id="ticketProduct" style="padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--ice);font-size:13px;outline:none;font-family:'Outfit',sans-serif;width:100%">
+              <option value="" style="background:#0F1B29;color:var(--muted)">— Seleccionar producto —</option>
+            </select>
+          </div>
+          <div class="ticket-row">
+            <div class="fg">
+              <label>Precio actual</label>
+              <input id="ticketCurrentPrice" readonly style="padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;color:var(--muted);font-size:13px;font-family:'Outfit',sans-serif;width:100%">
+            </div>
+            <div class="fg">
+              <label>Nuevo precio (MXN)</label>
+              <input id="ticketNewPrice" type="number" min="1" step="50" placeholder="Solo si cambias precio" style="padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--ice);font-size:13px;outline:none;font-family:'Outfit',sans-serif;width:100%">
+            </div>
           </div>
           <div class="ticket-row">
             <div class="fg">
               <label>Prioridad</label>
               <select id="ticketPriority" style="padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--ice);font-size:13px;outline:none;font-family:'Outfit',sans-serif;width:100%">
                 <option value="Normal" style="background:#0F1B29;color:var(--ice)">🟢 Normal</option>
-                <option value="High" style="background:#0F1B29;color:var(--ice)">🔴 Alta</option>
-                <option value="Low" style="background:#0F1B29;color:var(--ice)">⚪ Baja</option>
+                <option value="Alta" style="background:#0F1B29;color:var(--ice)">🔴 Alta</option>
+                <option value="Baja" style="background:#0F1B29;color:var(--ice)">⚪ Baja</option>
               </select>
             </div>
             <div class="fg">
@@ -261,11 +278,6 @@ td.price{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11p
             <button class="enter-btn" id="ticketBtn" onclick="submitTicket()">📨 Enviar reporte</button>
           </div>
           <div class="ticket-msg" id="ticketMsg"></div>
-        </div>
-        <!-- Open tickets list -->
-        <div class="ticket-list" id="ticketList">
-          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Reportes abiertos</div>
-          <div id="ticketsContainer"></div>
         </div>
       </div>
     </div>
@@ -312,7 +324,7 @@ const gw=document.getElementById('pw'),gate=document.getElementById('gate');
 function tryEnter(){
   if(gw.value.trim().toUpperCase()===PASSWORD){
     gate.classList.remove('denied');gate.classList.add('hidden');
-    document.getElementById('dash').classList.add('show');loadInventory();loadTickets();
+    document.getElementById('dash').classList.add('show');loadInventory();
   }else{gate.classList.add('denied');gw.value='';setTimeout(()=>gate.classList.remove('denied'),1400);}
 }
 document.getElementById('enterBtn').addEventListener('click',tryEnter);
@@ -366,7 +378,26 @@ function addProduct(){
 }
 
 /* ── TICKETS ── */
+function populateTicketProduct(){
+  var sel=document.getElementById('ticketProduct');
+  if(!sel)return;
+  sel.innerHTML='<option value="" style="background:#0F1B29;color:var(--muted)">\u2014 Seleccionar producto \u2014</option>';
+  inventoryData.forEach(function(i){
+    var opt=document.createElement('option');
+    opt.value=i.product;
+    opt.textContent=i.product+' \u2014 $'+(i.price>0?Number(i.price).toLocaleString('es-MX'):'\u2014');
+    sel.appendChild(opt);
+  });
+  sel.onchange=function(){
+    var p=inventoryData.find(function(x){return x.product===this.value;},this);
+    document.getElementById('ticketCurrentPrice').value=p&&p.price>0?'$ '+Number(p.price).toLocaleString('es-MX'):'\u2014';
+    if(p&&p.price>0)document.getElementById('ticketNewPrice').focus();
+  };
+}
+
 function submitTicket(){
+  var product=document.getElementById('ticketProduct').value;
+  var newPrice=parseFloat(document.getElementById('ticketNewPrice').value);
   var title=document.getElementById('ticketTitle').value.trim();
   var desc=document.getElementById('ticketDesc').value.trim();
   var priority=document.getElementById('ticketPriority').value;
@@ -374,7 +405,12 @@ function submitTicket(){
   var btn=document.getElementById('ticketBtn');
   var msg=document.getElementById('ticketMsg');
 
-  if(!title){msg.className='ticket-msg err';msg.textContent='❌ El título es obligatorio';msg.style.display='block';return;}
+  // Auto-generate title for price changes
+  if(product&&newPrice>0&&!title){
+    title="PRICE_CHANGE: "+product+" → $"+newPrice.toLocaleString('es-MX')+" MXN";
+  }
+
+  if(!title){msg.className='ticket-msg err';msg.textContent='Escribe un título o selecciona producto + precio';msg.style.display='block';return;}
 
   btn.disabled=true;btn.textContent='Enviando...';
   msg.className='ticket-msg';msg.style.display='none';
@@ -382,48 +418,21 @@ function submitTicket(){
   fetch(TICKET_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({passcode:PASSWORD,title:title,description:desc,priority:priority,submitter:submitter})
+    body:JSON.stringify({title:title,description:desc||'',priority:priority,submitter:submitter,product:product||'',newPrice:newPrice||0})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.success){
-      msg.className='ticket-msg ok';msg.textContent='✅ '+d.message;msg.style.display='block';
+    if(!d.error){
+      msg.className='ticket-msg ok';msg.textContent='✅ Reporte enviado — '+title;msg.style.display='block';
       document.getElementById('ticketTitle').value='';document.getElementById('ticketDesc').value='';
-      loadTickets();
+      document.getElementById('ticketProduct').value='';document.getElementById('ticketNewPrice').value='';document.getElementById('ticketCurrentPrice').value='';
     }else{
-      msg.className='ticket-msg err';msg.textContent='❌ '+d.error;msg.style.display='block';
+      var err=d.error.message||'Error al enviar';
+      msg.className='ticket-msg err';msg.textContent='❌ '+err;msg.style.display='block';
     }
     btn.disabled=false;btn.textContent='📨 Enviar reporte';
   }).catch(function(e){
-    msg.className='ticket-msg err';msg.textContent='❌ Error: '+e.message;msg.style.display='block';
+    msg.className='ticket-msg err';msg.textContent='❌ Error de conexión: '+e.message;msg.style.display='block';
     btn.disabled=false;btn.textContent='📨 Enviar reporte';
   });
-}
-
-function loadTickets(){
-  fetch(TICKET_URL).then(function(r){return r.json();}).then(function(d){
-    var list=document.getElementById('ticketList');
-    var container=document.getElementById('ticketsContainer');
-    var tickets=d.tickets||[];
-    if(tickets.length===0){
-      list.classList.remove('show');
-      return;
-    }
-    list.classList.add('show');
-    var html='';
-    tickets.forEach(function(t){
-      var pclass=t.priority==='High'?'high':t.priority==='Low'?'low':'normal';
-      var icon=t.priority==='High'?'🔴':t.priority==='Low'?'⚪':'🟢';
-      var created=t.created?new Date(t.created).toLocaleDateString('es-MX',{day:'numeric',month:'short'}):'';
-      html+='<div class="ticket-card">';
-      html+='  <div class="t-title">'+escapeHtml(t.title)+'</div>';
-      if(t.description)html+='  <div class="t-desc">'+escapeHtml(t.description)+'</div>';
-      html+='  <div class="t-meta">';
-      if(t.submitter)html+='    <span>👤 '+escapeHtml(t.submitter)+'</span>';
-      html+='    <span class="t-priority '+pclass+'">'+icon+' '+t.priority+'</span>';
-      html+='    <span>📅 '+created+'</span>';
-      html+='  </div></div>';
-    });
-    container.innerHTML=html;
-  }).catch(function(){});
 }
 
 function escapeHtml(s){var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}
@@ -434,18 +443,34 @@ function loadInventory(){
   area.innerHTML='<div class="loading"><div class="spinner"></div>Cargando inventario...</div>';
   document.getElementById('lastUpdated').textContent='';
   fetch(API_URL).then(function(r){return r.json();}).then(function(d){
-    if(d.error){area.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">Error: '+d.error+'</div>';return;}
-    inventoryData=d.inventory||[];
-    var s=d.summary;
+    if(d.error||!d.data){area.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">Error cargando inventario</div>';return;}
+    var raw=d.data||[];
+    var inv=[], inStock=0, lowStock=0, outOfStock=0, totalUnits=0;
+    raw.forEach(function(r,i){
+      var name=String(r["P\u00e9ptido"]||"").trim();
+      if(!name)return;
+      var stock=parseInt(r["Stock\nActual"]||r["Stock Actual"]||0);
+      var estado=String(r["Estado"]||"").trim();
+      var precio=parseFloat(r["2000"])||0;
+      var status="Out of Stock";
+      if(estado.indexOf("OK")>=0||estado.indexOf("\ud83d\udfe2")>=0)status="In Stock";
+      else if(stock>0&&stock<=10)status="Low Stock";
+      else if(stock>10)status="In Stock";
+      inv.push({sku:"SKU-"+(i+1),product:name,stock:stock,status:status,lowAlert:10,price:precio});
+      totalUnits+=stock;
+      if(status==="In Stock")inStock++;else if(status==="Low Stock")lowStock++;else outOfStock++;
+    });
+    inventoryData=inv;
     document.getElementById('summaryRow').innerHTML=
-      '<div class="stat-card green"><div class="num">'+s.inStock+'</div><div class="lbl">En Stock</div></div>'+
-      '<div class="stat-card amber"><div class="num">'+s.lowStock+'</div><div class="lbl">Bajo Stock</div></div>'+
-      '<div class="stat-card red"><div class="num">'+s.outOfStock+'</div><div class="lbl">Agotados</div></div>'+
-      '<div class="stat-card"><div class="num">'+s.totalSKUs+'</div><div class="lbl">Total SKUs</div></div>'+
-      '<div class="stat-card green"><div class="num">'+s.totalUnits+'</div><div class="lbl">Unidades</div></div>';
-    document.getElementById('lastUpdated').textContent='Actualizado: '+new Date(d.updated).toLocaleString('es-MX');
+      '<div class="stat-card green"><div class="num">'+inStock+'</div><div class="lbl">En Stock</div></div>'+
+      '<div class="stat-card amber"><div class="num">'+lowStock+'</div><div class="lbl">Bajo Stock</div></div>'+
+      '<div class="stat-card red"><div class="num">'+outOfStock+'</div><div class="lbl">Agotados</div></div>'+
+      '<div class="stat-card"><div class="num">'+inv.length+'</div><div class="lbl">Total SKUs</div></div>'+
+      '<div class="stat-card green"><div class="num">'+totalUnits+'</div><div class="lbl">Unidades</div></div>';
+    document.getElementById('lastUpdated').textContent='Actualizado: '+new Date().toLocaleString('es-MX');
     renderTable();
     renderNotas(inventoryData);
+    populateTicketProduct();
   }).catch(function(e){area.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">Error: '+e.message+'</div>';});
 }
 

@@ -12,6 +12,7 @@ import LightHealth from './pages/patient/LightHealth'
 import DoctorDashboard from './pages/doctor/Dashboard'
 import NewConsultation from './pages/doctor/NewConsultation'
 import PatientDetail from './pages/doctor/PatientDetail'
+import Inventario from './pages/doctor/Inventario'
 import EmailConfirmed from './pages/EmailConfirmed'
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/patient/light-health" element={<LightHealth />} />
           <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
           <Route path="/doctor/new-consultation" element={<NewConsultation />} />
+          <Route path="/doctor/inventario" element={<Inventario />} />
           <Route path="/doctor/patient/:id" element={<PatientDetail />} />
           <Route path="/confirmed" element={<EmailConfirmed />} />
         </Routes>

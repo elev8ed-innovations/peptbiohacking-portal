@@ -8,6 +8,7 @@ const COMMON_PEPTIDES = [
   'BPC-157', 'TB-500', 'Semaglutide', 'Tirzepatide', 'CJC-1295',
   'Ipamorelin', 'AOD-9604', 'PT-141', 'Sermorelin', 'GHK-Cu',
   'Epithalon', 'Selank', 'Semax', 'SS-31', 'MOTS-c',
+  'Retatrutide',
 ]
 
 const inp = {
@@ -59,12 +60,16 @@ export default function NewConsultation() {
   const updatePeptide = (i, field, val) => setProtocol(p => p.map((item, idx) => idx === i ? { ...item, [field]: val } : item))
 
   const handlePhotoUpload = async (files) => {
+    if (!selectedPatient) {
+      setSaveError('Select a patient first before uploading files.')
+      return
+    }
     const uploaded = []
     for (const file of files) {
-      const fileName = `${doctorId}/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('consult-photos').upload(fileName, file)
+      const fileName = `${selectedPatient}/${Date.now()}-${file.name}`
+      const { error } = await supabase.storage.from('lab-uploads').upload(fileName, file)
       if (!error) {
-        const { data: { publicUrl } } = supabase.storage.from('consult-photos').getPublicUrl(fileName)
+        const { data: { publicUrl } } = supabase.storage.from('lab-uploads').getPublicUrl(fileName)
         uploaded.push(publicUrl)
       }
     }

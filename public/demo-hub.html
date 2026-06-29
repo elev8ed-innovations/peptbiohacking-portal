@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeptBiohacking — Demo Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0B1C2E;
+  --navy2: #0F2438;
+  --teal: #2A7C6F;
+  --teal2: #349E8E;
+  --gold: #B8925A;
+  --gold2: #C9A84C;
+  --white: #FFFFFF;
+  --offwhite: #F5F4F0;
+  --muted: #7A8E9E;
+  --red: #C0392B;
+  --green: #3EAD7A;
+  --border: rgba(255,255,255,0.08);
+  --card: rgba(255,255,255,0.04);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--navy);
+  color: var(--white);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── HEADER ── */
+.header {
+  text-align: center;
+  padding: 48px 24px 32px;
+  background: linear-gradient(180deg, var(--navy2) 0%, var(--navy) 100%);
+  border-bottom: 1px solid var(--border);
+}
+
+.header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 400;
+  letter-spacing: 2px;
+}
+
+.header h1 em { 
+  color: var(--teal); 
+  font-style: italic;
+}
+
+.header .sub {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 10px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+
+.header .tagline {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(42,124,111,0.12);
+  border: 1px solid rgba(42,124,111,0.25);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--teal);
+  font-weight: 500;
+}
+
+/* ── GRID ── */
+.grid {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+/* ── WIDGET ── */
+.widget {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+.widget::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.widget:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+.widget:hover::before { opacity: 1; }
+
+/* Accent colors per widget */
+.widget[data-accent="teal"]::before { background: linear-gradient(90deg, var(--teal), var(--teal2)); }
+.widget[data-accent="gold"]::before { background: linear-gradient(90deg, var(--gold), var(--gold2)); }
+.widget[data-accent="red"]::before { background: linear-gradient(90deg, var(--red), #E74C3C); }
+.widget[data-accent="green"]::before { background: linear-gradient(90deg, var(--green), #5DCE9A); }
+.widget[data-accent="blue"]::before { background: linear-gradient(90deg, #3498DB, #5DADE2); }
+.widget[data-accent="purple"]::before { background: linear-gradient(90deg, #8E44AD, #AF7AC5); }
+
+.widget-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.widget h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.widget p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 300;
+}
+
+.widget .url {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--teal);
+  background: rgba(42,124,111,0.1);
+  padding: 3px 10px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.widget .status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.widget .status-dot.online { background: var(--green); box-shadow: 0 0 8px rgba(62,173,122,0.4); }
+.widget .status-dot.offline { background: var(--red); }
+
+/* ── STATUS BAR ── */
+.status-bar {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 20px 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .header { padding: 32px 16px 24px; }
+  .grid { grid-template-columns: 1fr; padding: 20px 16px 40px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PEPT<em>BIO</em>HACKING</h1>
+  <p class="sub">Panel de demostración — Todos los activos digitales</p>
+  <span class="tagline">🚀 Demo para Dr. V & Socios</span>
+</div>
+
+<div class="status-bar">
+  <div class="status-item"><span class="status-dot online"></span> Todos los servicios activos</div>
+  <div class="status-item" style="color:var(--gold);">📅 Actualizado: Julio 2026</div>
+</div>
+
+<div class="grid">
+
+  <a class="widget" data-accent="teal" href="https://peptbiohacking.com" target="_blank">
+    <span class="widget-icon">🏪</span>
+    <h3>Tienda Online</h3>
+    <p>Catálogo de productos, carrito de compras, y checkout con Mercado Pago</p>
+    <span class="url">peptbiohacking.com</span>
+  </a>
+
+  <a class="widget" data-accent="teal" href="https://peptbiohacking.mx" target="_blank">
+    <span class="widget-icon">👨‍⚕️</span>
+    <h3>Portal de Pacientes</h3>
+    <p>Dashboard de Dr. V, pacientes, métricas corporales, citas y mensajería</p>
+    <span class="url">peptbiohacking.mx</span>
+  </a>
+
+  <a class="widget" data-accent="gold" href="https://peptbiohacking.com/calculadora" target="_blank">
+    <span class="widget-icon">🧮</span>
+    <h3>Calculadora</h3>
+    <p>Calculadora de dosis y protocolos para pacientes y médicos</p>
+    <span class="url">peptbiohacking.com/calculadora</span>
+  </a>
+
+  <a class="widget" data-accent="green" href="https://peptbiohacking.mx/doctor/inventario" target="_blank">
+    <span class="widget-icon">📦</span>
+    <h3>Inventario</h3>
+    <p>Panel de inventario con stock en tiempo real desde Airtable + reportes</p>
+    <span class="url">peptbiohacking.mx/doctor/inventario</span>
+  </a>
+
+  <a class="widget" data-accent="purple" href="https://peptbiohacking-quiz.netlify.app" target="_blank">
+    <span class="widget-icon">📋</span>
+    <h3>Quiz de Bienvenida</h3>
+    <p>Cuestionario interactivo para nuevos pacientes — recomendación personalizada</p>
+    <span class="url">peptbiohacking-quiz.netlify.app</span>
+  </a>
+
+  <a class="widget" data-accent="blue" href="https://peptbiohacking.com/shop" target="_blank">
+    <span class="widget-icon">🛍️</span>
+    <h3>Catálogo de Productos</h3>
+    <p>Shop con badges de stock en tiempo real, filtros y carrito</p>
+    <span class="url">peptbiohacking.com/shop</span>
+  </a>
+
+  <a class="widget" data-accent="gold" href="https://peptbiohacking.com/checkout" target="_blank">
+    <span class="widget-icon">💳</span>
+    <h3>Checkout</h3>
+    <p>Pago con Mercado Pago — formulario de envío + procesamiento</p>
+    <span class="url">peptbiohacking.com/checkout</span>
+  </a>
+
+  <a class="widget" data-accent="red" href="https://peptbiohacking.mx/inventario.html" target="_blank">
+    <span class="widget-icon">🔧</span>
+    <h3>Inventario Legacy</h3>
+    <p>Panel de inventario original con passcode para soporte interno</p>
+    <span class="url">peptbiohacking.mx/inventario.html</span>
+  </a>
+
+</div>
+
+<!-- ── Footer ── -->
+<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px;border-top:1px solid var(--border);max-width:1000px;margin:0 auto;">
+  Hecho con ❤️ para Dr. Valenzuela · <span style="color:var(--teal);">Elev8ed Innovations LLC</span>
+</div>
+
+</body>
+</html>
