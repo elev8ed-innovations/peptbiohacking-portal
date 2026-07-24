@@ -47,15 +47,18 @@ export default function PatientDetail() {
       setPatient(prof)
       setMessages(msgs || [])
 
-      // Get public URLs from storage (bucket is public — no expiry)
+      // Medical documents live in a private bucket. Generate short-lived URLs
+      // after the doctor's authenticated list request succeeds.
       const labsWithUrls = await Promise.all(
         (labData || []).map(async (f) => {
           const path = `${id}/${f.name}`
-          const { data: { publicUrl } } = supabase.storage.from('lab-uploads').getPublicUrl(path)
+          const { data: signed, error: signedUrlError } = await supabase.storage
+            .from('lab-uploads')
+            .createSignedUrl(path, 3600)
           return {
             file_name: f.name,
             uploaded_at: f.created_at,
-            displayUrl: publicUrl || '',
+            displayUrl: signedUrlError ? '' : (signed?.signedUrl || ''),
           }
         })
       )
