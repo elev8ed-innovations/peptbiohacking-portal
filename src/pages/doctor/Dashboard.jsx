@@ -4,6 +4,7 @@ import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
 import AppointmentIntakeModal from '../../components/AppointmentIntakeModal'
+import { calculateBmi, validateBodyMetricInput } from '../../lib/healthMetrics'
 
 export default function DoctorDashboard() {
   const { t } = useLang()
@@ -11,6 +12,7 @@ export default function DoctorDashboard() {
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState({})
+  const [summaryErrors, setSummaryErrors] = useState({})
   const [generating, setGenerating] = useState({})
   const [todayAppts, setTodayAppts] = useState([])
   const [loadingAppts, setLoadingAppts] = useState(true)
@@ -18,12 +20,27 @@ export default function DoctorDashboard() {
   const [bodyMetrics, setBodyMetrics] = useState([])
   const [metricsPatient, setMetricsPatient] = useState(null)
   const [metricsLoading, setMetricsLoading] = useState(false)
-  const [metricForm, setMetricForm] = useState({ weight: "", fat: "", bmi: "", muscle: "", waist: "" })
+  const [metricForm, setMetricForm] = useState({ weight: '', height: '', fat: '', muscle: '', waist: '' })
+  const [metricError, setMetricError] = useState('')
+  const [doctorId, setDoctorId] = useState(null)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/login'); return }
+
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (currentProfile?.role !== 'doctor') {
+        navigate('/patient/dashboard', { replace: true })
+        return
+      }
+
+      setDoctorId(user.id)
 
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
@@ -50,40 +67,27 @@ export default function DoctorDashboard() {
   const generateSummary = async (patient) => {
     setGenerating(g => ({ ...g, [patient.id]: true }))
     setSummaries(s => ({ ...s, [patient.id]: null }))
-
-    const [{ data: checkins }, { data: consults }, { data: labs }, { data: bodyM }] = await Promise.all([
-      supabase.from('wellness_checkins').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }).limit(10),
-      supabase.from('consultations').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
-      supabase.from('lab_uploads').select('file_name, uploaded_at').eq('patient_id', patient.id),
-      supabase.from('body_metrics').select('*').eq('patient_id', patient.id).order('recorded_at', { ascending: false }).limit(10),
-    ])
-
-    const patientContext = `
-Patient: ${patient.full_name}
-Email: ${patient.email}
-
-Recent Wellness Check-ins (last ${checkins?.length || 0}):
-${checkins?.map(c => `- Date: ${new Date(c.created_at).toLocaleDateString()}, Wellness Score: ${c.wellness_score}/10${c.notes ? `, Notes: ${c.notes}` : ''}${c.energy_level ? `, Energy: ${c.energy_level}/10` : ''}${c.sleep_quality ? `, Sleep: ${c.sleep_quality}/10` : ''}`).join('\n') || 'No check-ins recorded'}
-
-Consultations (${consults?.length || 0} total):
-${consults?.map(c => `- Date: ${new Date(c.created_at).toLocaleDateString()}, Chief complaint: ${c.chief_complaint || 'N/A'}, Protocol: ${JSON.stringify(c.peptide_protocol || [])}`).join('\n') || 'No consultations recorded'}
-
-Lab Uploads (${labs?.length || 0} files):
-${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString()})`).join('\n') || 'No lab results uploaded'}
-\nBody Metrics (${bodyM?.length || 0} readings):\n${bodyM?.map(bm => `  - ${new Date(bm.recorded_at).toLocaleDateString()}: ${bm.weight_kg ? `Weight: ${bm.weight_kg}kg` : ""} ${bm.body_fat_pct ? `Body Fat: ${bm.body_fat_pct}%` : ""} ${bm.bmi ? `BMI: ${bm.bmi}` : ""} ${bm.muscle_kg ? `Muscle: ${bm.muscle_kg}kg` : ""} ${bm.waist_cm ? `Waist: ${bm.waist_cm}cm` : ""}`.trim()).join("\n") || "No body metrics recorded"}
-    `.trim()
+    setSummaryErrors(s => ({ ...s, [patient.id]: '' }))
 
     try {
-      const response = await fetch('/.netlify/functions/summarize-patient', {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Your session expired. Please sign in again.')
+
+      const response = await fetch('/api/doctor-summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientContext, patientName: patient.full_name })
-      });
-      const data = await response.json();
-      const summary = data.summary || 'Unable to generate summary.';
-      setSummaries(s => ({ ...s, [patient.id]: summary }));
-    } catch (e) {
-      setSummaries(s => ({ ...s, [patient.id]: 'Error generating summary. Please try again.' }));
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ patientId: patient.id }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'AI summary could not be generated.')
+      if (!data.summary) throw new Error('AI provider returned an empty summary.')
+
+      setSummaries(s => ({ ...s, [patient.id]: data }))
+    } catch (error) {
+      setSummaryErrors(s => ({ ...s, [patient.id]: error.message || 'Error generating summary. Please try again.' }))
     }
 
     setGenerating(g => ({ ...g, [patient.id]: false }))
@@ -99,6 +103,7 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
       .eq("patient_id", patientId)
       .order("recorded_at", { ascending: false })
     setBodyMetrics(data || [])
+    setMetricForm(form => ({ ...form, height: data?.[0]?.height_cm ?? '' }))
     setMetricsLoading(false)
   }
 
@@ -106,16 +111,30 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
     if (!metricsPatient) return
     const f = metricForm
     const numeric = (v) => (v === "" || v === null || v === undefined) ? null : parseFloat(v)
+    const formForValidation = {
+      weight_kg: f.weight,
+      height_cm: f.height,
+      body_fat_pct: f.fat,
+      muscle_kg: f.muscle,
+      waist_cm: f.waist,
+      bmi_override: false,
+    }
+    const validationError = validateBodyMetricInput(formForValidation)
+    if (validationError) { setMetricError(validationError); return }
+    setMetricError('')
     const payload = {
       patient_id: metricsPatient,
+      recorded_by: doctorId,
       weight_kg: numeric(f.weight),
+      height_cm: numeric(f.height),
       body_fat_pct: numeric(f.fat),
-      bmi: numeric(f.bmi),
+      bmi: calculateBmi(f.weight, f.height),
       muscle_kg: numeric(f.muscle),
       waist_cm: numeric(f.waist),
     }
-    await supabase.from("body_metrics").insert(payload)
-    setMetricForm({ weight: "", fat: "", bmi: "", muscle: "", waist: "" })
+    const { error } = await supabase.from('body_metrics').insert(payload)
+    if (error) { setMetricError(error.message || 'No se pudo guardar la medición.'); return }
+    setMetricForm(form => ({ weight: '', height: form.height, fat: '', muscle: '', waist: '' }))
     await loadBodyMetrics(metricsPatient)
   }
 
@@ -319,8 +338,18 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
                       ✦ {t.summaryTitle}
                     </div>
                     <p style={{ color: '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
-                      {summaries[patient.id]}
+                      {summaries[patient.id].summary}
                     </p>
+                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(201,168,76,0.18)', color: '#6F7777', fontFamily: 'Outfit, sans-serif', fontSize: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      <span>{summaries[patient.id].notice || 'AI-generated draft. Doctor review required.'}</span>
+                      <span>{summaries[patient.id].generatedAt ? new Date(summaries[patient.id].generatedAt).toLocaleString() : ''}</span>
+                    </div>
+                  </div>
+                )}
+
+                {summaryErrors[patient.id] && (
+                  <div role="alert" style={{ marginTop: '14px', padding: '12px 16px', background: 'rgba(192,57,43,0.06)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: '9px', color: '#9D352B', fontFamily: 'Outfit, sans-serif', fontSize: '13px' }}>
+                    {summaryErrors[patient.id]}
                   </div>
                 )}
               </div>
@@ -358,7 +387,7 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
           <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid #F0EFEA' }}>
               <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '18px', color: '#0A1628' }}>
-                {(patients.find(p => p.id === metricsPatient)?.full_name || 'Patient') + ' — ' + (bodyMetrics.length > 0 ? (latestMetric.recorded_at ? new Date(bodyMetrics[0].recorded_at).toLocaleDateString() : 'Reciente') : 'Sin mediciones')}
+                {(patients.find(p => p.id === metricsPatient)?.full_name || 'Patient') + ' — ' + (bodyMetrics.length > 0 ? (bodyMetrics[0]?.recorded_at ? new Date(bodyMetrics[0].recorded_at).toLocaleDateString() : 'Reciente') : 'Sin mediciones')}
               </span>
               <span style={{ fontSize: '12px', color: 'rgba(26,42,42,.4)' }}>{bodyMetrics.length + ' registro(s)'}</span>
             </div>
@@ -387,19 +416,22 @@ ${labs?.map(l => `- ${l.file_name} (${new Date(l.uploaded_at).toLocaleDateString
             <div style={{ background: 'rgba(0,194,168,.03)', padding: '14px 20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px dashed rgba(0,194,168,.2)' }}>
               {[
                 { key: 'weight', label: 'Peso' },
+                { key: 'height', label: 'Estatura cm' },
                 { key: 'fat', label: 'Grasa%' },
-                { key: 'bmi', label: 'IMC' },
                 { key: 'muscle', label: 'Musculo' },
                 { key: 'waist', label: 'Cintura' },
               ].map(f => (
                 <input key={f.key} placeholder={f.label} value={metricForm[f.key] || ''}
                   onChange={e => setMetricForm(fm => ({ ...fm, [f.key]: e.target.value }))}
-                  style={{ width: f.key === 'bmi' ? '70px' : '90px', padding: '8px 10px', border: '1px solid #E5E5E5', borderRadius: '8px', fontFamily: 'Outfit, sans-serif', fontSize: '13px', background: '#fff', color: '#1A2A2A' }} />
+                  type="number" step="0.1"
+                  style={{ width: '95px', padding: '8px 10px', border: '1px solid #E5E5E5', borderRadius: '8px', fontFamily: 'Outfit, sans-serif', fontSize: '13px', background: '#fff', color: '#1A2A2A' }} />
               ))}
+              {calculateBmi(metricForm.weight, metricForm.height) != null && <span style={{ fontSize: '12px', color: '#2A7C6F', fontWeight: 700 }}>IMC {calculateBmi(metricForm.weight, metricForm.height)}</span>}
               <button onClick={saveBodyMetrics} style={{ padding: '8px 18px', background: '#2A7C6F', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>
                 Guardar
               </button>
             </div>
+            {metricError && <p style={{ color: '#dc2626', padding: '0 20px 14px', margin: 0, fontSize: '12px' }}>{metricError}</p>}
           </div>
         ) : (
           <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '14px', padding: '28px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>

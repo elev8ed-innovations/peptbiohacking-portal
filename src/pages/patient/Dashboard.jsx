@@ -5,6 +5,7 @@ import IntroModal from '../../components/IntroModal'
 import WaiverGate from '../../components/WaiverGate'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
+import ProgressDashboard from '../../components/ProgressDashboard'
 
 const SHOP_URL = import.meta.env.VITE_PEPTBIOHACK_SHOP_URL || 'https://peptbiohack.mx'
 
@@ -60,7 +61,7 @@ export default function PatientDashboard() {
 
       const [{ data: consults }, { data: chks }] = await Promise.all([
         supabase.from('consultations').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }).limit(3),
+        supabase.from('wellness_checkins').select('*').eq('patient_id', user.id).order('created_at', { ascending: false }),
       ])
 
       setConsultations(consults || [])
@@ -170,11 +171,11 @@ export default function PatientDashboard() {
                 <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>{t.noCheckins}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {checkins.map((c, i) => (
+                  {checkins.slice(0, 3).map((c, i) => (
                     <div key={i} style={{ borderBottom: '1px solid #F5F5F5', paddingBottom: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <span style={{ color: '#2A2A2A', opacity: 0.45, fontSize: '12px', fontFamily: 'Outfit, sans-serif' }}>{new Date(c.created_at).toLocaleDateString()}</span>
-                        <span style={{ color: '#0A1628', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 700 }}>{t.wellnessScore}: {c.wellness_score}/10</span>
+                        <span style={{ color: '#0A1628', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 700 }}>{t.wellnessScore}: {c.mood ?? '—'}/10</span>
                       </div>
                       {c.notes && <p style={{ color: '#2A2A2A', opacity: 0.65, fontSize: '13px', fontFamily: 'Outfit, sans-serif', margin: 0 }}>{c.notes}</p>}
                     </div>
@@ -206,8 +207,17 @@ export default function PatientDashboard() {
           </div>
         </div>
 
-        {/* BODY METRICS SECTION */}
         {!metricsLoading && (
+          <ProgressDashboard
+            bodyMetrics={bodyMetrics}
+            checkins={checkins}
+            role="patient"
+            onPrimaryAction={() => navigate('/patient/progress')}
+          />
+        )}
+
+        {/* Legacy static metrics markup retained temporarily for rollback safety. */}
+        {false && !metricsLoading && (
           <div style={{ marginTop: '36px' }}>
             <p style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C9A84C', fontFamily: 'Outfit, sans-serif', marginBottom: '8px' }}>{'Dashboard'}</p>
             <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '28px', color: '#0A1628', margin: '0 0 4px' }}>
