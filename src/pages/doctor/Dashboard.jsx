@@ -70,19 +70,20 @@ export default function DoctorDashboard() {
     setSummaryErrors(s => ({ ...s, [patient.id]: '' }))
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Your session expired. Please sign in again.')
-
-      const response = await fetch('/api/doctor-summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ patientId: patient.id }),
+      const { data, error } = await supabase.functions.invoke('doctor-summary', {
+        body: { patientId: patient.id },
       })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'AI summary could not be generated.')
+
+      if (error) {
+        let message = 'AI summary could not be generated.'
+        try {
+          const errorPayload = await error.context?.json()
+          if (errorPayload?.error) message = errorPayload.error
+        } catch {
+          // Keep the safe fallback message when the gateway has no JSON body.
+        }
+        throw new Error(message)
+      }
       if (!data.summary) throw new Error('AI provider returned an empty summary.')
 
       setSummaries(s => ({ ...s, [patient.id]: data }))
