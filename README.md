@@ -16,6 +16,31 @@ Patient/doctor portal PWA for PeptBiohacking — Dr. Fernando Valenzuela Carpio.
 
 Connected to Netlify at `pept-app.netlify.app`. Push to `main` to auto-deploy (if Netlify GitHub integration is configured).
 
+## Doctor AI summary
+
+The doctor-only patient summary runs in the authenticated Supabase Edge Function
+`doctor-summary`. Netlify serves the portal frontend but does not process the
+patient snapshot or hold the AI provider key.
+
+Set these secrets in Supabase Edge Function Secrets (never with a `VITE_` prefix):
+
+```text
+OPENROUTER_API_KEY=<dedicated restricted key>
+OPENROUTER_MODEL=deepseek/deepseek-r1:free
+```
+
+Deploy with JWT verification enabled:
+
+```bash
+supabase functions deploy doctor-summary --use-api
+```
+
+The function requires a signed-in user, verifies the `doctor` role through RLS,
+queries only bounded patient records, removes known identifiers, sends no lab
+file contents, enforces ZDR/no-data-collection routing, stores metadata-only usage
+records, and rate-limits each doctor. The result is a draft that requires medical
+review; it is not a diagnosis or prescription.
+
 ## Roles
 
 - **Doctor** — login with doctor account to access patient list, create consultations, view check-ins

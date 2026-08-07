@@ -4,6 +4,7 @@ dist
 .DS_Store
 .DS_Store
 supabase/.temp/
+supabase/functions/.env
 
 # Local Netlify folder
 .netlify

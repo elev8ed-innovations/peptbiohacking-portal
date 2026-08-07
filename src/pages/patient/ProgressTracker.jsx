@@ -17,6 +17,7 @@ export default function ProgressTracker() {
   const [form, setForm] = useState({ weight: '', energy: 5, sleep: 5, mood: 5, notes: '' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [userId, setUserId] = useState(null)
 
   useEffect(() => {
@@ -38,14 +39,20 @@ export default function ProgressTracker() {
   const save = async () => {
     if (!userId) return
     setSaving(true)
-    await supabase.from('wellness_checkins').insert({
+    setSaveError('')
+    const { error } = await supabase.from('wellness_checkins').insert({
       patient_id: userId,
-      wellness_score: form.mood,
+      mood: form.mood,
       notes: form.notes,
       weight: form.weight || null,
-      energy_level: form.energy,
-      sleep_quality: form.sleep,
+      energy: form.energy,
+      sleep: form.sleep,
     })
+    if (error) {
+      setSaveError(error.message || 'No se pudo guardar el check-in. Intenta de nuevo.')
+      setSaving(false)
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
     setSaving(false)
@@ -100,6 +107,7 @@ export default function ProgressTracker() {
               rows={3}
               style={{ ...inp, minHeight: '80px', resize: 'vertical' }}
             />
+            {saveError && <p style={{ color: '#dc2626', fontFamily: 'Outfit, sans-serif', fontSize: '13px', margin: 0 }}>{saveError}</p>}
             <button
               onClick={save} disabled={saving}
               style={{
@@ -128,7 +136,7 @@ export default function ProgressTracker() {
                         {new Date(e.created_at).toLocaleDateString()}
                       </span>
                       <span style={{ color: '#0A1628', fontSize: '13px', fontFamily: 'Outfit, sans-serif', fontWeight: 700 }}>
-                        {e.wellness_score}/10
+                        {e.mood ?? '—'}/10
                       </span>
                     </div>
                     {e.weight && <p style={{ color: '#2A2A2A', opacity: 0.6, fontSize: '12px', fontFamily: 'Outfit, sans-serif', margin: '0 0 4px' }}>Weight: {e.weight} kg</p>}

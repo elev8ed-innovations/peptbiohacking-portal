@@ -9,15 +9,27 @@ export default function WellnessCheckin() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const save = async () => {
     setSaving(true)
+    setSaveError('')
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('wellness_checkins').insert({
+    if (!user) {
+      setSaveError('Tu sesión expiró. Inicia sesión de nuevo.')
+      setSaving(false)
+      return
+    }
+    const { error } = await supabase.from('wellness_checkins').insert({
       patient_id: user.id,
-      wellness_score: score,
+      mood: score,
       notes,
     })
+    if (error) {
+      setSaveError(error.message || 'No se pudo guardar el check-in. Intenta de nuevo.')
+      setSaving(false)
+      return
+    }
     setSaved(true)
     setNotes('')
     setTimeout(() => setSaved(false), 2500)
@@ -85,6 +97,7 @@ export default function WellnessCheckin() {
               transition: 'background 0.2s',
             }}
           >{saved ? `✓ ${t.saved}` : t.save}</button>
+          {saveError && <p style={{ color: '#dc2626', fontFamily: 'Outfit, sans-serif', fontSize: '13px', margin: 0, textAlign: 'center' }}>{saveError}</p>}
         </div>
       </div>
     </div>

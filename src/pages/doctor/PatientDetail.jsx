@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
+import ProgressDashboard from '../../components/ProgressDashboard'
+import { calculateBmi, isPlausibleBmi, toNumber, validateBodyMetricInput } from '../../lib/healthMetrics'
 
 export default function PatientDetail() {
   const { id } = useParams()
@@ -15,11 +17,15 @@ export default function PatientDetail() {
   const [labs, setLabs] = useState([])
   const [consults, setConsults] = useState([])
   const [bodyMetrics, setBodyMetrics] = useState([])
+  const [checkins, setCheckins] = useState([])
   const [bmLoading, setBmLoading] = useState(false)
   const [bmForm, setBmForm] = useState({
     weight_kg: '',
+    height_cm: '',
     body_fat_pct: '',
     bmi: '',
+    bmi_override: false,
+    bmi_override_reason: '',
     muscle_kg: '',
     waist_cm: '',
     notes: ''
@@ -35,13 +41,14 @@ export default function PatientDetail() {
       const { data: { user } } = await supabase.auth.getUser()
       setDoctorId(user.id)
 
-      const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }] = await Promise.all([
+      const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }, { data: checkinData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('messages').select('*')
           .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
           .order('created_at', { ascending: true }),
         supabase.storage.from('lab-uploads').list(id, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } }),
         supabase.from('consultations').select('*').eq('patient_id', id).order('created_at', { ascending: false }),
+        supabase.from('wellness_checkins').select('*').eq('patient_id', id).order('created_at', { ascending: false }),
       ])
 
       setPatient(prof)
@@ -64,6 +71,7 @@ export default function PatientDetail() {
       )
       setLabs(labsWithUrls)
       setConsults(consultData || [])
+      setCheckins(checkinData || [])
       if (user) {
         const { data: bm } = await supabase
           .from('body_metrics')
@@ -71,6 +79,7 @@ export default function PatientDetail() {
           .eq('patient_id', id)
           .order('recorded_at', { ascending: false })
         setBodyMetrics(bm || [])
+        if (bm?.[0]?.height_cm) setBmForm(form => ({ ...form, height_cm: bm[0].height_cm }))
       }
     }
     load()
@@ -82,13 +91,25 @@ export default function PatientDetail() {
 
   const handleBodyMetricSubmit = async () => {
     if (bmSaving) return
+    const validationError = validateBodyMetricInput(bmForm)
+    if (validationError) { setBmError(validationError); return }
     const payload = {}
     let hasValue = false
-    const numericFields = ['weight_kg', 'body_fat_pct', 'bmi', 'muscle_kg', 'waist_cm']
+    const numericFields = ['weight_kg', 'height_cm', 'body_fat_pct', 'muscle_kg', 'waist_cm']
     numericFields.forEach(k => {
       const v = parseFloat(bmForm[k])
       if (!isNaN(v)) { payload[k] = v; hasValue = true }
     })
+    const calculatedBmi = calculateBmi(bmForm.weight_kg, bmForm.height_cm)
+    if (bmForm.bmi_override) {
+      payload.bmi = toNumber(bmForm.bmi)
+      payload.bmi_override = true
+      payload.bmi_override_reason = bmForm.bmi_override_reason.trim()
+      hasValue = true
+    } else if (calculatedBmi !== null) {
+      payload.bmi = calculatedBmi
+      payload.bmi_override = false
+    }
     if (bmForm.notes.trim()) { payload.notes = bmForm.notes.trim(); hasValue = true }
     if (!hasValue) {
       setBmError('Ingresa al menos una medición antes de guardar.')
@@ -103,7 +124,9 @@ export default function PatientDetail() {
     }).select()
     if (!error) {
       setBodyMetrics(prev => [...(data || []), ...prev])
-      setBmForm({ weight_kg: '', body_fat_pct: '', bmi: '', muscle_kg: '', waist_cm: '', notes: '' })
+      setBmForm(form => ({ weight_kg: '', height_cm: form.height_cm, body_fat_pct: '', bmi: '', bmi_override: false, bmi_override_reason: '', muscle_kg: '', waist_cm: '', notes: '' }))
+    } else {
+      setBmError(error.message || 'No se pudo guardar la medición.')
     }
     setBmSaving(false)
   }
@@ -168,7 +191,7 @@ export default function PatientDetail() {
                 cursor: 'pointer',
               }}
             >
-              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : t.consultations}
+              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : tab_ === 'body_metrics' ? (t.progress || 'Progreso') : t.consultations}
             </button>
           ))}
         </div>
@@ -269,6 +292,7 @@ export default function PatientDetail() {
         {/* Body Metrics Tab */}
         {tab === 'body_metrics' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <ProgressDashboard bodyMetrics={bodyMetrics} checkins={checkins} role="doctor" />
             {/* Input Form */}
             <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', margin: '0 0 4px' }}>
@@ -281,8 +305,8 @@ export default function PatientDetail() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
                 {[
                   { key: 'weight_kg', label: 'Peso', unit: 'kg', placeholder: '70.0' },
+                  { key: 'height_cm', label: 'Estatura', unit: 'cm', placeholder: '170' },
                   { key: 'body_fat_pct', label: 'Grasa Corporal', unit: '%', placeholder: '15.0' },
-                  { key: 'bmi', label: 'IMC', unit: '', placeholder: '22.5' },
                   { key: 'muscle_kg', label: 'Masa Muscular', unit: 'kg', placeholder: '35.0' },
                   { key: 'waist_cm', label: 'Cintura', unit: 'cm', placeholder: '80' },
                 ].map(f => (
@@ -305,6 +329,25 @@ export default function PatientDetail() {
                     />
                   </div>
                 ))}
+              </div>
+
+              <div style={{ marginBottom: '16px', padding: '14px', background: 'rgba(0,194,168,.05)', border: '1px solid rgba(0,194,168,.18)', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#2A2A2A', opacity: .5, textTransform: 'uppercase', letterSpacing: '.08em' }}>IMC calculado</div>
+                    <strong style={{ color: '#0A1628', fontSize: '22px' }}>{calculateBmi(bmForm.weight_kg, bmForm.height_cm) ?? '—'}</strong>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#0A1628', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={bmForm.bmi_override} onChange={e => setBmForm(form => ({ ...form, bmi_override: e.target.checked, bmi: '', bmi_override_reason: '' }))} style={{ accentColor: '#C9A84C' }} />
+                    Ajuste médico manual
+                  </label>
+                </div>
+                {bmForm.bmi_override && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px', marginTop: '12px' }}>
+                    <input type="number" step="0.1" placeholder="IMC" value={bmForm.bmi} onChange={e => setBmForm(form => ({ ...form, bmi: e.target.value }))} style={{ padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: '8px' }} />
+                    <input placeholder="Motivo clínico obligatorio" value={bmForm.bmi_override_reason} onChange={e => setBmForm(form => ({ ...form, bmi_override_reason: e.target.value }))} style={{ padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: '8px' }} />
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '16px' }}>
@@ -367,6 +410,7 @@ export default function PatientDetail() {
                       <tr style={{ borderBottom: '1px solid #E5E5E5' }}>
                         <th style={{ padding: '10px 16px', textAlign: 'left', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Fecha'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Peso'}</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Estatura'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Grasa'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'IMC'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Musculo'}</th>
@@ -385,11 +429,16 @@ export default function PatientDetail() {
                             {m.weight_kg != null && <span style={{ color: '#2A2A2A', opacity: 0.4, marginLeft: '2px' }}>kg</span>}
                           </td>
                           <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'Outfit, sans-serif' }}>
+                            <span style={{ fontWeight: 600 }}>{m.height_cm ?? '--'}</span>
+                            {m.height_cm != null && <span style={{ color: '#2A2A2A', opacity: 0.4, marginLeft: '2px' }}>cm</span>}
+                          </td>
+                          <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'Outfit, sans-serif' }}>
                             <span style={{ fontWeight: 600 }}>{m.body_fat_pct ?? '--'}</span>
                             {m.body_fat_pct != null && <span style={{ color: '#2A2A2A', opacity: 0.4, marginLeft: '2px' }}>%</span>}
                           </td>
                           <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'Outfit, sans-serif' }}>
-                            <span style={{ fontWeight: 600 }}>{m.bmi ?? '--'}</span>
+                            <span style={{ fontWeight: 600, color: m.bmi != null && !isPlausibleBmi(m.bmi, m.bmi_override) ? '#b45309' : 'inherit' }}>{m.bmi ?? '--'}</span>
+                            {m.bmi_override && <span title={m.bmi_override_reason || ''} style={{ color: '#C9A84C', marginLeft: '4px' }}>†</span>}
                           </td>
                           <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'Outfit, sans-serif' }}>
                             <span style={{ fontWeight: 600 }}>{m.muscle_kg ?? '--'}</span>
