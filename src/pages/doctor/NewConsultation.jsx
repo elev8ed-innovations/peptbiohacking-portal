@@ -82,7 +82,7 @@ export default function NewConsultation() {
     setSaveError('')
     setSaveSuccess(false)
 
-    const { error } = await supabase.from('consultations').insert({
+    const { data: savedConsultation, error } = await supabase.from('consultations').insert({
       doctor_id: doctorId,
       patient_id: selectedPatient,
       chief_complaint: chiefComplaint,
@@ -90,7 +90,7 @@ export default function NewConsultation() {
       peptide_protocol: protocol.filter(p => p.name),
       photos,
       appointment_id: appointmentId || null,
-    })
+    }).select('id').single()
 
     setSaving(false)
 
@@ -101,7 +101,7 @@ export default function NewConsultation() {
     }
 
     setSaveSuccess(true)
-    setTimeout(() => navigate('/doctor/dashboard'), 800)
+    setTimeout(() => navigate(`/doctor/patient/${selectedPatient}?tab=consultations&consultation=${savedConsultation.id}`), 800)
   }
 
   return (

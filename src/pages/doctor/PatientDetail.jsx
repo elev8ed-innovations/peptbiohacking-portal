@@ -1,21 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
 import ProgressDashboard from '../../components/ProgressDashboard'
+import ConsultationHistory from '../../components/ConsultationHistory'
 import { calculateBmi, isPlausibleBmi, toNumber, validateBodyMetricInput } from '../../lib/healthMetrics'
 
 export default function PatientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useLang()
   const [patient, setPatient] = useState(null)
-  const [tab, setTab] = useState('messages')
+  const requestedTab = searchParams.get('tab')
+  const [tab, setTab] = useState(['messages', 'labs', 'body_metrics', 'consultations'].includes(requestedTab) ? requestedTab : 'messages')
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [labs, setLabs] = useState([])
   const [consults, setConsults] = useState([])
+  const [consultLoading, setConsultLoading] = useState(true)
+  const [consultError, setConsultError] = useState('')
   const [bodyMetrics, setBodyMetrics] = useState([])
   const [checkins, setCheckins] = useState([])
   const [bmLoading, setBmLoading] = useState(false)
@@ -32,16 +37,30 @@ export default function PatientDetail() {
   })
   const [bmSaving, setBmSaving] = useState(false)
   const [bmError, setBmError] = useState('')
+  const [bmConsultationId, setBmConsultationId] = useState('')
   const [doctorId, setDoctorId] = useState(null)
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
+
+  const refreshConsultations = async () => {
+    setConsultLoading(true)
+    setConsultError('')
+    const { data, error } = await supabase
+      .from('consultations')
+      .select('*')
+      .eq('patient_id', id)
+      .order('created_at', { ascending: false })
+    setConsults(data || [])
+    setConsultError(error?.message || '')
+    setConsultLoading(false)
+  }
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       setDoctorId(user.id)
 
-      const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }, { data: checkinData }] = await Promise.all([
+      const [{ data: prof }, { data: msgs }, { data: labData }, consultResult, { data: checkinData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('messages').select('*')
           .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
@@ -70,7 +89,9 @@ export default function PatientDetail() {
         })
       )
       setLabs(labsWithUrls)
-      setConsults(consultData || [])
+      setConsults(consultResult.data || [])
+      setConsultError(consultResult.error?.message || '')
+      setConsultLoading(false)
       setCheckins(checkinData || [])
       if (user) {
         const { data: bm } = await supabase
@@ -120,11 +141,13 @@ export default function PatientDetail() {
     const { data, error } = await supabase.from('body_metrics').insert({
       patient_id: id,
       recorded_by: doctorId,
+      consultation_id: bmConsultationId || null,
       ...payload
     }).select()
     if (!error) {
       setBodyMetrics(prev => [...(data || []), ...prev])
       setBmForm(form => ({ weight_kg: '', height_cm: form.height_cm, body_fat_pct: '', bmi: '', bmi_override: false, bmi_override_reason: '', muscle_kg: '', waist_cm: '', notes: '' }))
+      setBmConsultationId('')
     } else {
       setBmError(error.message || 'No se pudo guardar la medición.')
     }
@@ -352,6 +375,29 @@ export default function PatientDetail() {
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A1628', marginBottom: '6px', fontFamily: 'Outfit, sans-serif' }}>
+                  {'Vincular a consulta (opcional)'}
+                </label>
+                <select
+                  value={bmConsultationId}
+                  onChange={e => setBmConsultationId(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', minHeight: '44px',
+                    background: '#FAF7F2', border: '1px solid #E5E5E5',
+                    borderRadius: '10px', color: '#0A1628',
+                    fontFamily: 'Outfit, sans-serif', fontSize: '14px', outline: 'none',
+                  }}
+                >
+                  <option value="">Sin vínculo — solo progreso</option>
+                  {consults.filter(c => c.status !== 'voided').map(c => (
+                    <option key={c.id} value={c.id}>
+                      {new Date(c.created_at).toLocaleDateString('es-MX')} — {c.chief_complaint || 'Consulta clínica'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A1628', marginBottom: '6px', fontFamily: 'Outfit, sans-serif' }}>
                   {'Notas (opcional)'}
                 </label>
                 <textarea
@@ -463,35 +509,15 @@ export default function PatientDetail() {
 
         {/* Consultations Tab */}
         {tab === 'consultations' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {consults.length === 0 ? (
-              <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '40px', textAlign: 'center', color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                No consultations yet
-              </div>
-            ) : consults.map((c, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ color: '#00A891', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '14px' }}>
-                    {new Date(c.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {c.chief_complaint && <p style={{ color: '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: '0 0 10px', lineHeight: '1.5' }}>{c.chief_complaint}</p>}
-                {c.peptide_protocol?.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {c.peptide_protocol.map((p, j) => (
-                      <span key={j} style={{
-                        background: 'rgba(0,194,168,0.08)', border: '1px solid rgba(0,194,168,0.3)',
-                        borderRadius: '8px', padding: '4px 12px', color: '#00A891', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 600,
-                      }}>
-                        {p.name}{p.dose && ` — ${p.dose}`}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {c.notes && <p style={{ color: '#2A2A2A', opacity: 0.6, fontFamily: 'Outfit, sans-serif', fontSize: '13px', margin: '12px 0 0', lineHeight: '1.5' }}>{c.notes}</p>}
-              </div>
-            ))}
-          </div>
+          <ConsultationHistory
+            patientId={id}
+            consultations={consults}
+            bodyMetrics={bodyMetrics}
+            loading={consultLoading}
+            error={consultError}
+            initialConsultationId={searchParams.get('consultation')}
+            onRefresh={refreshConsultations}
+          />
         )}
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
