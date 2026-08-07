@@ -1,5 +1,6 @@
 import "@supabase/functions-js/edge-runtime.d.ts"
 import { withSupabase } from "@supabase/server"
+import type { Database } from "./database.types.ts"
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 const DEFAULT_MODEL = "deepseek/deepseek-r1:free"
@@ -16,7 +17,7 @@ const json = (status: number, payload: Record<string, unknown>) => Response.json
   },
 })
 
-const cleanText = (value: unknown, redactions: string[], maxLength = 600) => {
+export const cleanText = (value: unknown, redactions: string[], maxLength = 600) => {
   if (typeof value !== "string") return null
 
   let cleaned = value
@@ -42,7 +43,7 @@ type SnapshotInput = {
   redactions: string[]
 }
 
-function buildClinicalSnapshot({ checkins, consultations, labs, bodyMetrics, redactions }: SnapshotInput) {
+export function buildClinicalSnapshot({ checkins, consultations, labs, bodyMetrics, redactions }: SnapshotInput) {
   return {
     wellness_checkins: checkins.map((row) => ({
       date: row.created_at,
@@ -97,7 +98,7 @@ function extractSummary(data: Record<string, unknown> | null, redactions: string
 }
 
 export default {
-  fetch: withSupabase({ auth: "user" }, async (request, ctx) => {
+  fetch: withSupabase<Database>({ auth: "user" }, async (request, ctx) => {
     if (request.method !== "POST") return json(405, { error: "Method not allowed" })
 
     let requestBody: Record<string, unknown>
