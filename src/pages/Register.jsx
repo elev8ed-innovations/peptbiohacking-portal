@@ -14,7 +14,7 @@ const inp = {
 export default function Register() {
   const navigate = useNavigate()
   const { lang, toggleLang } = useLang()
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'patient' })
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -26,29 +26,16 @@ export default function Register() {
     setLoading(true)
     setError('')
 
-    // CRITICAL: pass full_name + role in user metadata so handle_new_user trigger can read them
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
-        data: { full_name: form.name, role: form.role },
+        data: { full_name: form.name },
         emailRedirectTo: `${window.location.origin}/confirmed`,
       },
     })
 
     if (signUpError) { setError(signUpError.message); setLoading(false); return }
-
-    // Belt-and-suspenders upsert — wrapped so it never crashes the success state
-    if (data.user) {
-      try {
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: form.name,
-          role: form.role,
-          email: form.email,
-        }, { onConflict: 'id' })
-      } catch (_) {}
-    }
 
     setSuccess(true)
     setLoading(false)
@@ -137,16 +124,6 @@ export default function Register() {
               </label>
               <input name="password" type="password" style={inp} placeholder={lang === 'es' ? 'Mínimo 8 caracteres' : 'Minimum 8 characters'} value={form.password} onChange={handleChange} required minLength={8} />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#2A2A2A', opacity: 0.55, fontFamily: 'Outfit, sans-serif', marginBottom: '6px' }}>
-                {lang === 'es' ? 'Tipo de cuenta' : 'Account Type'}
-              </label>
-              <select name="role" style={{ ...inp, cursor: 'pointer' }} value={form.role} onChange={handleChange}>
-                <option value="patient">{lang === 'es' ? 'Paciente' : 'Patient'}</option>
-                <option value="doctor">{lang === 'es' ? 'Médico' : 'Doctor'}</option>
-              </select>
-            </div>
-
             {error && <p style={{ color: '#dc2626', fontSize: '13px', fontFamily: 'Outfit, sans-serif' }}>{error}</p>}
 
             <button type="submit" disabled={loading} style={{

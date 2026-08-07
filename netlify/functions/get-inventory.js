@@ -3,6 +3,7 @@
 // PAT comes from Netlify env var AIRTABLE_TOKEN (set in dashboard).
 const AIRTABLE_PAT = process.env.AIRTABLE_TOKEN || '';
 const BASE_ID = 'appKo9tyGtIju3UHN';
+const { requireDoctor, response } = require('./_doctor-auth');
 
 async function fetchAirtable(table, params = '') {
   const url = `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(table)}?${params}`;
@@ -17,8 +18,14 @@ async function fetchAirtable(table, params = '') {
   return resp.json();
 }
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, body: '' };
+  if (event.httpMethod !== 'GET') return response(405, { error: 'GET only' });
+
   try {
+    const auth = await requireDoctor(event);
+    if (auth.error) return auth.error;
+
     const [invData, ticketData] = await Promise.all([
       fetchAirtable('Inventario', 'sort%5B0%5D%5Bfield%5D=P%C3%A9ptido&sort%5B0%5D%5Bdirection%5D=asc'),
       fetchAirtable('Tech%20Tickets', 'filterByFormula=%7BEstatus%7D%3D%22Open%22'),
@@ -37,13 +44,12 @@ exports.handler = async () => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
       body: JSON.stringify({ products, openTickets }),
     };
   } catch (err) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      ...response(500, { error: 'Inventory unavailable' }),
     };
   }
 };
