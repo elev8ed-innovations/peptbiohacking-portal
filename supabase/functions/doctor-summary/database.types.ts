@@ -46,6 +46,7 @@ export type Database = {
         bmi_override: boolean
         muscle_kg: number | null
         waist_cm: number | null
+        status: "active" | "voided"
       }>
       doctor_ai_summary_usage: Table<{
         id: string

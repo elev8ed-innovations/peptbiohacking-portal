@@ -176,7 +176,7 @@ export default {
       ctx.supabase.from("wellness_checkins").select("created_at,mood,energy,sleep,weight,notes").eq("patient_id", patientId).order("created_at", { ascending: false }).limit(10),
       ctx.supabase.from("consultations").select("created_at,chief_complaint,notes,peptide_protocol").eq("patient_id", patientId).order("created_at", { ascending: false }).limit(5),
       ctx.supabase.from("lab_uploads").select("uploaded_at").eq("patient_id", patientId).order("uploaded_at", { ascending: false }).limit(10),
-      ctx.supabase.from("body_metrics").select("recorded_at,weight_kg,height_cm,body_fat_pct,bmi,bmi_override,muscle_kg,waist_cm").eq("patient_id", patientId).order("recorded_at", { ascending: false }).limit(10),
+      ctx.supabase.from("body_metrics").select("recorded_at,weight_kg,height_cm,body_fat_pct,bmi,bmi_override,muscle_kg,waist_cm").eq("patient_id", patientId).eq("status", "active").order("recorded_at", { ascending: false }).limit(10),
     ])
 
     const queryError = results.find((result) => result.error)?.error

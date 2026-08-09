@@ -38,6 +38,7 @@ export default function PatientDetail() {
   const [bmSaving, setBmSaving] = useState(false)
   const [bmError, setBmError] = useState('')
   const [bmConsultationId, setBmConsultationId] = useState('')
+  const [historySelection, setHistorySelection] = useState('')
   const [doctorId, setDoctorId] = useState(null)
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
@@ -53,6 +54,16 @@ export default function PatientDetail() {
     setConsults(data || [])
     setConsultError(error?.message || '')
     setConsultLoading(false)
+  }
+
+  const refreshBodyMetrics = async () => {
+    const { data, error } = await supabase
+      .from('body_metrics')
+      .select('*')
+      .eq('patient_id', id)
+      .order('recorded_at', { ascending: false })
+    if (!error) setBodyMetrics(data || [])
+    return { data, error }
   }
 
   useEffect(() => {
@@ -100,7 +111,8 @@ export default function PatientDetail() {
           .eq('patient_id', id)
           .order('recorded_at', { ascending: false })
         setBodyMetrics(bm || [])
-        if (bm?.[0]?.height_cm) setBmForm(form => ({ ...form, height_cm: bm[0].height_cm }))
+        const latestActiveMetric = (bm || []).find(metric => metric.status !== 'voided')
+        if (latestActiveMetric?.height_cm) setBmForm(form => ({ ...form, height_cm: latestActiveMetric.height_cm }))
       }
     }
     load()
@@ -172,6 +184,7 @@ export default function PatientDetail() {
   }
 
   const tabs = ['messages', 'labs', 'body_metrics', 'consultations']
+  const activeBodyMetrics = bodyMetrics.filter(metric => metric.status !== 'voided')
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2' }}>
@@ -214,7 +227,7 @@ export default function PatientDetail() {
                 cursor: 'pointer',
               }}
             >
-              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : tab_ === 'body_metrics' ? (t.progress || 'Progreso') : t.consultations}
+              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : tab_ === 'body_metrics' ? (t.progress || 'Progreso') : 'Historial clínico'}
             </button>
           ))}
         </div>
@@ -315,7 +328,7 @@ export default function PatientDetail() {
         {/* Body Metrics Tab */}
         {tab === 'body_metrics' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <ProgressDashboard bodyMetrics={bodyMetrics} checkins={checkins} role="doctor" />
+            <ProgressDashboard bodyMetrics={activeBodyMetrics} checkins={checkins} role="doctor" />
             {/* Input Form */}
             <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', margin: '0 0 4px' }}>
@@ -440,10 +453,10 @@ export default function PatientDetail() {
                   {'Historial de Mediciones'}
                 </h3>
                 <span style={{ fontSize: '12px', color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif' }}>
-                  {bodyMetrics.length} {bodyMetrics.length === 1 ? 'registro' : 'registros'}
+                  {activeBodyMetrics.length} {activeBodyMetrics.length === 1 ? 'registro' : 'registros'}
                 </span>
               </div>
-              {bodyMetrics.length === 0 ? (
+              {activeBodyMetrics.length === 0 ? (
                 <div style={{ padding: '40px 24px', textAlign: 'center' }}>
                   <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>
                     {'Aun no hay mediciones registradas'}
@@ -462,11 +475,12 @@ export default function PatientDetail() {
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Musculo'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Cintura'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Notas'}</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Expediente'}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bodyMetrics.map((m, i) => (
-                        <tr key={m.id} style={{ borderBottom: i < bodyMetrics.length - 1 ? '1px solid #F5F4F0' : 'none' }}>
+                      {activeBodyMetrics.map((m, i) => (
+                        <tr key={m.id} style={{ borderBottom: i < activeBodyMetrics.length - 1 ? '1px solid #F5F4F0' : 'none' }}>
                           <td style={{ padding: '10px 16px', color: '#0A1628', fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'Outfit, sans-serif' }}>
                             {new Date(m.recorded_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
@@ -497,6 +511,12 @@ export default function PatientDetail() {
                           <td style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.5, fontFamily: 'Outfit, sans-serif', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {m.notes || '--'}
                           </td>
+                          <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={() => { setHistorySelection(`metric:${m.id}`); setTab('consultations') }}
+                              style={{ border: '1px solid rgba(0,194,168,.3)', background: 'rgba(0,194,168,.07)', color: '#168676', borderRadius: '8px', padding: '7px 10px', fontFamily: 'Outfit, sans-serif', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                            >Ver registro →</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -516,7 +536,9 @@ export default function PatientDetail() {
             loading={consultLoading}
             error={consultError}
             initialConsultationId={searchParams.get('consultation')}
+            initialEntryKey={historySelection}
             onRefresh={refreshConsultations}
+            onRefreshBodyMetrics={refreshBodyMetrics}
           />
         )}
       </div>
