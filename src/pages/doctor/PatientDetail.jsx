@@ -1,21 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
 import ProgressDashboard from '../../components/ProgressDashboard'
+import ConsultationHistory from '../../components/ConsultationHistory'
 import { calculateBmi, isPlausibleBmi, toNumber, validateBodyMetricInput } from '../../lib/healthMetrics'
 
 export default function PatientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useLang()
   const [patient, setPatient] = useState(null)
-  const [tab, setTab] = useState('messages')
+  const requestedTab = searchParams.get('tab')
+  const [tab, setTab] = useState(['messages', 'labs', 'body_metrics', 'consultations'].includes(requestedTab) ? requestedTab : 'messages')
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [labs, setLabs] = useState([])
   const [consults, setConsults] = useState([])
+  const [consultLoading, setConsultLoading] = useState(true)
+  const [consultError, setConsultError] = useState('')
   const [bodyMetrics, setBodyMetrics] = useState([])
   const [checkins, setCheckins] = useState([])
   const [bmLoading, setBmLoading] = useState(false)
@@ -32,16 +37,41 @@ export default function PatientDetail() {
   })
   const [bmSaving, setBmSaving] = useState(false)
   const [bmError, setBmError] = useState('')
+  const [bmConsultationId, setBmConsultationId] = useState('')
+  const [historySelection, setHistorySelection] = useState('')
   const [doctorId, setDoctorId] = useState(null)
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
+
+  const refreshConsultations = async () => {
+    setConsultLoading(true)
+    setConsultError('')
+    const { data, error } = await supabase
+      .from('consultations')
+      .select('*')
+      .eq('patient_id', id)
+      .order('created_at', { ascending: false })
+    setConsults(data || [])
+    setConsultError(error?.message || '')
+    setConsultLoading(false)
+  }
+
+  const refreshBodyMetrics = async () => {
+    const { data, error } = await supabase
+      .from('body_metrics')
+      .select('*')
+      .eq('patient_id', id)
+      .order('recorded_at', { ascending: false })
+    if (!error) setBodyMetrics(data || [])
+    return { data, error }
+  }
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       setDoctorId(user.id)
 
-      const [{ data: prof }, { data: msgs }, { data: labData }, { data: consultData }, { data: checkinData }] = await Promise.all([
+      const [{ data: prof }, { data: msgs }, { data: labData }, consultResult, { data: checkinData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('messages').select('*')
           .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
@@ -70,7 +100,9 @@ export default function PatientDetail() {
         })
       )
       setLabs(labsWithUrls)
-      setConsults(consultData || [])
+      setConsults(consultResult.data || [])
+      setConsultError(consultResult.error?.message || '')
+      setConsultLoading(false)
       setCheckins(checkinData || [])
       if (user) {
         const { data: bm } = await supabase
@@ -79,7 +111,8 @@ export default function PatientDetail() {
           .eq('patient_id', id)
           .order('recorded_at', { ascending: false })
         setBodyMetrics(bm || [])
-        if (bm?.[0]?.height_cm) setBmForm(form => ({ ...form, height_cm: bm[0].height_cm }))
+        const latestActiveMetric = (bm || []).find(metric => metric.status !== 'voided')
+        if (latestActiveMetric?.height_cm) setBmForm(form => ({ ...form, height_cm: latestActiveMetric.height_cm }))
       }
     }
     load()
@@ -120,11 +153,13 @@ export default function PatientDetail() {
     const { data, error } = await supabase.from('body_metrics').insert({
       patient_id: id,
       recorded_by: doctorId,
+      consultation_id: bmConsultationId || null,
       ...payload
     }).select()
     if (!error) {
       setBodyMetrics(prev => [...(data || []), ...prev])
       setBmForm(form => ({ weight_kg: '', height_cm: form.height_cm, body_fat_pct: '', bmi: '', bmi_override: false, bmi_override_reason: '', muscle_kg: '', waist_cm: '', notes: '' }))
+      setBmConsultationId('')
     } else {
       setBmError(error.message || 'No se pudo guardar la medición.')
     }
@@ -149,6 +184,7 @@ export default function PatientDetail() {
   }
 
   const tabs = ['messages', 'labs', 'body_metrics', 'consultations']
+  const activeBodyMetrics = bodyMetrics.filter(metric => metric.status !== 'voided')
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF7F2' }}>
@@ -191,7 +227,7 @@ export default function PatientDetail() {
                 cursor: 'pointer',
               }}
             >
-              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : tab_ === 'body_metrics' ? (t.progress || 'Progreso') : t.consultations}
+              {tab_ === 'messages' ? t.messages : tab_ === 'labs' ? t.labs : tab_ === 'body_metrics' ? (t.progress || 'Progreso') : 'Historial clínico'}
             </button>
           ))}
         </div>
@@ -292,7 +328,7 @@ export default function PatientDetail() {
         {/* Body Metrics Tab */}
         {tab === 'body_metrics' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <ProgressDashboard bodyMetrics={bodyMetrics} checkins={checkins} role="doctor" />
+            <ProgressDashboard bodyMetrics={activeBodyMetrics} checkins={checkins} role="doctor" />
             {/* Input Form */}
             <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', margin: '0 0 4px' }}>
@@ -352,6 +388,29 @@ export default function PatientDetail() {
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A1628', marginBottom: '6px', fontFamily: 'Outfit, sans-serif' }}>
+                  {'Vincular a consulta (opcional)'}
+                </label>
+                <select
+                  value={bmConsultationId}
+                  onChange={e => setBmConsultationId(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', minHeight: '44px',
+                    background: '#FAF7F2', border: '1px solid #E5E5E5',
+                    borderRadius: '10px', color: '#0A1628',
+                    fontFamily: 'Outfit, sans-serif', fontSize: '14px', outline: 'none',
+                  }}
+                >
+                  <option value="">Sin vínculo — solo progreso</option>
+                  {consults.filter(c => c.status !== 'voided').map(c => (
+                    <option key={c.id} value={c.id}>
+                      {new Date(c.created_at).toLocaleDateString('es-MX')} — {c.chief_complaint || 'Consulta clínica'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A1628', marginBottom: '6px', fontFamily: 'Outfit, sans-serif' }}>
                   {'Notas (opcional)'}
                 </label>
                 <textarea
@@ -394,10 +453,10 @@ export default function PatientDetail() {
                   {'Historial de Mediciones'}
                 </h3>
                 <span style={{ fontSize: '12px', color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif' }}>
-                  {bodyMetrics.length} {bodyMetrics.length === 1 ? 'registro' : 'registros'}
+                  {activeBodyMetrics.length} {activeBodyMetrics.length === 1 ? 'registro' : 'registros'}
                 </span>
               </div>
-              {bodyMetrics.length === 0 ? (
+              {activeBodyMetrics.length === 0 ? (
                 <div style={{ padding: '40px 24px', textAlign: 'center' }}>
                   <p style={{ color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: 0 }}>
                     {'Aun no hay mediciones registradas'}
@@ -416,11 +475,12 @@ export default function PatientDetail() {
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Musculo'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Cintura'}</th>
                         <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Notas'}</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.45, fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>{'Expediente'}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bodyMetrics.map((m, i) => (
-                        <tr key={m.id} style={{ borderBottom: i < bodyMetrics.length - 1 ? '1px solid #F5F4F0' : 'none' }}>
+                      {activeBodyMetrics.map((m, i) => (
+                        <tr key={m.id} style={{ borderBottom: i < activeBodyMetrics.length - 1 ? '1px solid #F5F4F0' : 'none' }}>
                           <td style={{ padding: '10px 16px', color: '#0A1628', fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'Outfit, sans-serif' }}>
                             {new Date(m.recorded_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
@@ -451,6 +511,12 @@ export default function PatientDetail() {
                           <td style={{ padding: '10px 16px', textAlign: 'right', color: '#2A2A2A', opacity: 0.5, fontFamily: 'Outfit, sans-serif', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {m.notes || '--'}
                           </td>
+                          <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={() => { setHistorySelection(`metric:${m.id}`); setTab('consultations') }}
+                              style={{ border: '1px solid rgba(0,194,168,.3)', background: 'rgba(0,194,168,.07)', color: '#168676', borderRadius: '8px', padding: '7px 10px', fontFamily: 'Outfit, sans-serif', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                            >Ver registro →</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -463,35 +529,17 @@ export default function PatientDetail() {
 
         {/* Consultations Tab */}
         {tab === 'consultations' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {consults.length === 0 ? (
-              <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '40px', textAlign: 'center', color: '#2A2A2A', opacity: 0.4, fontFamily: 'Outfit, sans-serif', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                No consultations yet
-              </div>
-            ) : consults.map((c, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ color: '#00A891', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '14px' }}>
-                    {new Date(c.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {c.chief_complaint && <p style={{ color: '#2A2A2A', fontFamily: 'Outfit, sans-serif', fontSize: '14px', margin: '0 0 10px', lineHeight: '1.5' }}>{c.chief_complaint}</p>}
-                {c.peptide_protocol?.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {c.peptide_protocol.map((p, j) => (
-                      <span key={j} style={{
-                        background: 'rgba(0,194,168,0.08)', border: '1px solid rgba(0,194,168,0.3)',
-                        borderRadius: '8px', padding: '4px 12px', color: '#00A891', fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 600,
-                      }}>
-                        {p.name}{p.dose && ` — ${p.dose}`}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {c.notes && <p style={{ color: '#2A2A2A', opacity: 0.6, fontFamily: 'Outfit, sans-serif', fontSize: '13px', margin: '12px 0 0', lineHeight: '1.5' }}>{c.notes}</p>}
-              </div>
-            ))}
-          </div>
+          <ConsultationHistory
+            patientId={id}
+            consultations={consults}
+            bodyMetrics={bodyMetrics}
+            loading={consultLoading}
+            error={consultError}
+            initialConsultationId={searchParams.get('consultation')}
+            initialEntryKey={historySelection}
+            onRefresh={refreshConsultations}
+            onRefreshBodyMetrics={refreshBodyMetrics}
+          />
         )}
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

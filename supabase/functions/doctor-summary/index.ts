@@ -3,8 +3,8 @@ import { withSupabase } from "@supabase/server"
 import type { Database } from "./database.types.ts"
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-const DEFAULT_MODEL = "deepseek/deepseek-r1:free"
-const REQUEST_TIMEOUT_MS = 25_000
+const DEFAULT_MODEL = "deepseek/deepseek-r1"
+const REQUEST_TIMEOUT_MS = 45_000
 const DAILY_LIMIT = 40
 const BURST_LIMIT = 10
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -176,7 +176,7 @@ export default {
       ctx.supabase.from("wellness_checkins").select("created_at,mood,energy,sleep,weight,notes").eq("patient_id", patientId).order("created_at", { ascending: false }).limit(10),
       ctx.supabase.from("consultations").select("created_at,chief_complaint,notes,peptide_protocol").eq("patient_id", patientId).order("created_at", { ascending: false }).limit(5),
       ctx.supabase.from("lab_uploads").select("uploaded_at").eq("patient_id", patientId).order("uploaded_at", { ascending: false }).limit(10),
-      ctx.supabase.from("body_metrics").select("recorded_at,weight_kg,height_cm,body_fat_pct,bmi,bmi_override,muscle_kg,waist_cm").eq("patient_id", patientId).order("recorded_at", { ascending: false }).limit(10),
+      ctx.supabase.from("body_metrics").select("recorded_at,weight_kg,height_cm,body_fat_pct,bmi,bmi_override,muscle_kg,waist_cm").eq("patient_id", patientId).eq("status", "active").order("recorded_at", { ascending: false }).limit(10),
     ])
 
     const queryError = results.find((result) => result.error)?.error

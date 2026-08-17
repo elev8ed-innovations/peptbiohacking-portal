@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import { supabase } from '../../lib/supabase'
+
+async function doctorFetch(url, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Doctor authentication required')
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  })
+}
 
 const STATUS_CONFIG = {
   'In Stock': { icon: '🟢', color: '#3EAD7A', bg: 'rgba(62,173,122,0.1)', border: 'rgba(62,173,122,0.3)' },
@@ -41,7 +54,8 @@ export default function Inventario() {
   useEffect(() => {
     async function load() {
       try {
-        const resp = await fetch('/.netlify/functions/get-inventory')
+        const resp = await doctorFetch('/.netlify/functions/get-inventory')
+        if (!resp.ok) throw new Error(`Inventory request failed: ${resp.status}`)
         const data = await resp.json()
         const mapped = (data.products || []).map(p => ({
           ...p,
@@ -95,14 +109,13 @@ export default function Inventario() {
     setTicketSaving(true)
     setTicketMsg(null)
     try {
-      const resp = await fetch('/.netlify/functions/submit-ticket', {
+      const resp = await doctorFetch('/.netlify/functions/submit-ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titulo: title,
           descripcion: ticketDesc,
           prioridad: ticketPriority,
-          reporta: 'Dr. V',
         }),
       })
       const data = await resp.json()
