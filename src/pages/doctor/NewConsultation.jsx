@@ -69,8 +69,8 @@ export default function NewConsultation() {
       const fileName = `${selectedPatient}/${Date.now()}-${file.name}`
       const { error } = await supabase.storage.from('lab-uploads').upload(fileName, file)
       if (!error) {
-        const { data: { publicUrl } } = supabase.storage.from('lab-uploads').getPublicUrl(fileName)
-        uploaded.push(publicUrl)
+        const { data: signed, error: signError } = await supabase.storage.from('lab-uploads').createSignedUrl(fileName, 60 * 60)
+        if (!signError && signed?.signedUrl) uploaded.push(signed.signedUrl)
       }
     }
     setPhotos(prev => [...prev, ...uploaded])

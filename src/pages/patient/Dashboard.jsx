@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
 import ProgressDashboard from '../../components/ProgressDashboard'
 
-const SHOP_URL = import.meta.env.VITE_PEPTBIOHACK_SHOP_URL || 'https://peptbiohack.mx'
+const SHOP_URL = import.meta.env.VITE_PEPTBIOHACK_SHOP_URL || 'https://peptbiohacking.com'
 
 function slugify(name) {
   return (name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -149,7 +149,7 @@ export default function PatientDashboard() {
                         <td style={{ padding: '12px', color: '#2A2A2A', opacity: 0.7 }}>{p.dose || '—'}</td>
                         <td style={{ padding: '12px', color: '#2A2A2A', opacity: 0.7 }}>{p.frequency || '—'}</td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <a href={`${SHOP_URL}/products/${slugify(p.name)}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`${SHOP_URL}/shop.html?sku=${p.sku || slugify(p.name)}`} target="_blank" rel="noopener noreferrer"
                             style={{ display: 'inline-block', padding: '6px 14px', background: '#C9A84C', color: '#fff', borderRadius: '8px', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '12px', textDecoration: 'none' }}>
                             {t.reorder}
                           </a>
