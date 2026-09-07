@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import WaiverGate from './WaiverGate'
+import { requiresWaiver } from '../lib/waiver'
 
 export default function ProtectedRoute({ role, children }) {
   const [access, setAccess] = useState({ loading: true, role: null })
@@ -18,12 +20,12 @@ export default function ProtectedRoute({ role, children }) {
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, has_signed_waiver')
         .eq('id', user.id)
         .single()
 
       if (!active) return
-      setAccess({ loading: false, role: profileError ? null : profile?.role || null })
+      setAccess({ loading: false, role: profileError ? null : profile?.role || null, userId: user.id, hasSignedWaiver: profile?.has_signed_waiver === true })
     }
 
     verifyAccess()
@@ -48,6 +50,10 @@ export default function ProtectedRoute({ role, children }) {
   if (!access.role) return <Navigate to="/login" replace />
   if (access.role !== role) {
     return <Navigate to={access.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard'} replace />
+  }
+
+  if (requiresWaiver(access)) {
+    return <WaiverGate key={access.userId} userId={access.userId} onAccepted={() => setAccess(current => ({ ...current, hasSignedWaiver: true }))} />
   }
 
   return children

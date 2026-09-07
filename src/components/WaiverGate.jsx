@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
+import { saveWaiver } from '../lib/waiver'
+
+function CheckBox({ checked, onToggle, title, sub }) {
+  return <label style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '18px' }}>
+    <input type="checkbox" checked={checked} onChange={onToggle} style={{ width: '24px', height: '24px', flexShrink: 0, accentColor: '#0A1628' }} />
+    <span><strong style={{ display: 'block', fontSize: '14px' }}>{title}</strong><span style={{ fontSize: '12px', lineHeight: 1.5 }}>{sub}</span></span>
+  </label>
+}
 
 export default function WaiverGate({ userId, onAccepted }) {
   const { lang } = useLang()
@@ -8,45 +16,23 @@ export default function WaiverGate({ userId, onAccepted }) {
   const [check2, setCheck2] = useState(false)
   const [check3, setCheck3] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const allChecked = check1 && check2 && check3
 
   const handleAccept = async () => {
-    if (!allChecked) return
+    if (!allChecked || saving) return
     setSaving(true)
-    await supabase
-      .from('profiles')
-      .update({ has_signed_waiver: true })
-      .eq('id', userId)
-    onAccepted()
+    setError('')
+    try {
+      await saveWaiver(supabase, userId)
+      onAccepted()
+    } catch {
+      setError(lang === 'es' ? 'No se pudo guardar tu aceptación. Intenta de nuevo.' : 'Your acceptance could not be saved. Please try again.')
+    } finally { setSaving(false) }
   }
 
   const es = lang === 'es'
-
-  const CheckBox = ({ checked, onToggle, title, sub }) => (
-    <label
-      style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '18px' }}
-      onClick={onToggle}
-    >
-      <div style={{
-        width: '24px', height: '24px', minWidth: '24px', borderRadius: '6px',
-        border: `2px solid ${checked ? '#0A1628' : '#E5E5E5'}`,
-        background: checked ? '#0A1628' : '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginTop: '2px', transition: 'all 0.15s',
-      }}>
-        {checked && <span style={{ color: '#fff', fontSize: '13px', fontWeight: 700 }}>✓</span>}
-      </div>
-      <div>
-        <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: '14px', fontWeight: 600, color: '#0A1628', marginBottom: '3px' }}>
-          {title}
-        </div>
-        <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: '12px', color: '#2A2A2A', opacity: 0.55, lineHeight: 1.5 }}>
-          {sub}
-        </div>
-      </div>
-    </label>
-  )
 
   return (
     <div style={{
@@ -56,7 +42,7 @@ export default function WaiverGate({ userId, onAccepted }) {
     }}>
       <div style={{
         background: '#FAF7F2', borderRadius: '20px', padding: '40px 36px',
-        maxWidth: '500px', width: '100%', boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+        maxWidth: '500px', width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
       }}>
         {/* Header */}
         <div style={{ marginBottom: '28px' }}>
@@ -101,6 +87,7 @@ export default function WaiverGate({ userId, onAccepted }) {
         />
 
         {/* Button */}
+        {error && <p role="alert" style={{ color: '#A12B2B' }}>{error}</p>}
         <button
           onClick={handleAccept}
           disabled={!allChecked || saving}
