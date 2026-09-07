@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { toNumber, validateBodyMetricInput } from '../lib/healthMetrics'
 import './ConsultationHistory.css'
+import ConsultationAttachments from './ConsultationAttachments'
 
 const emptyProtocol = [{ name: '', dose: '', frequency: '' }]
 
@@ -330,6 +331,7 @@ export default function ConsultationHistory({
           <div className="consult-actions"><button disabled={selected.status === 'voided'} onClick={beginEdit}>✎ Corregir consulta</button><button className="danger" disabled={selected.status === 'voided'} onClick={() => { setAnnulling(true); setActionError('') }}>Anular…</button></div>
           <article><span>MOTIVO DE CONSULTA</span><p>{selected.chief_complaint || 'Sin motivo capturado.'}</p></article>
           <article><span>NOTAS CLÍNICAS</span><p>{selected.notes || 'Sin notas clínicas capturadas.'}</p></article>
+          <ConsultationAttachments photos={selected.photos} patientId={patientId} />
           <article><span>PROTOCOLO INDICADO</span><div className="consult-protocol">{protocolRows(selected.peptide_protocol).filter(row => row.name).length === 0 ? <p>Sin protocolo capturado.</p> : protocolRows(selected.peptide_protocol).filter(row => row.name).map((row, index) => <div key={`${row.name}-${index}`}><strong>{row.name}</strong><span>{row.dose || 'Sin dosis'}</span><span>{row.frequency || 'Sin frecuencia'}</span></div>)}</div></article>
           <article><span>MEDICIONES VINCULADAS</span>{linkedMetrics.length === 0 ? <p className="consult-muted">No hay mediciones vinculadas explícitamente a esta consulta. Las mediciones históricas siguen disponibles en Progreso.</p> : <div className="consult-linked-metrics">{linkedMetrics.map(metric => <div key={metric.id}><small>{formatDate(metric.recorded_at)}</small><strong>{metric.weight_kg ?? '—'} kg</strong><span>IMC {metric.bmi ?? '—'} · Grasa {metric.body_fat_pct ?? '—'}%</span></div>)}</div>}</article>
           <article><span>HISTORIAL DE CAMBIOS</span>{revisions.length === 0 ? <p className="consult-muted">Sin correcciones ni anulaciones.</p> : <div className="consult-revisions">{revisions.map(revision => <div key={revision.id}><strong>{revision.change_type === 'void' ? 'Consulta anulada' : 'Corrección clínica'}</strong><span>{revision.reason}</span><small>{formatDate(revision.created_at, true)}</small></div>)}</div>}</article>

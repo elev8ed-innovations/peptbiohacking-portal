@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 import { useLang } from '../../context/LanguageContext'
+import ConsultationAttachments from '../../components/ConsultationAttachments'
 
 const COMMON_PEPTIDES = [
   'BPC-157', 'TB-500', 'Semaglutide', 'Tirzepatide', 'CJC-1295',
@@ -29,6 +30,7 @@ export default function NewConsultation() {
   const [notes, setNotes] = useState('')
   const [protocol, setProtocol] = useState([{ name: '', dose: '', frequency: '' }])
   const [photos, setPhotos] = useState([])
+  const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -64,20 +66,23 @@ export default function NewConsultation() {
       setSaveError('Select a patient first before uploading files.')
       return
     }
-    const uploaded = []
-    for (const file of files) {
-      const fileName = `${selectedPatient}/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('lab-uploads').upload(fileName, file)
-      if (!error) {
-        const { data: signed, error: signError } = await supabase.storage.from('lab-uploads').createSignedUrl(fileName, 60 * 60)
-        if (!signError && signed?.signedUrl) uploaded.push(signed.signedUrl)
+    if (uploading || saving) return
+    setUploading(true)
+    setSaveError('')
+    try {
+      for (const file of files) {
+        const fileName = `${selectedPatient}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const { error } = await supabase.storage.from('lab-uploads').upload(fileName, file)
+        if (error) throw error
+        setPhotos(prev => [...prev, fileName])
       }
-    }
-    setPhotos(prev => [...prev, ...uploaded])
+    } catch {
+      setSaveError('Some files could not be uploaded. Review the attached files and retry the missing files.')
+    } finally { setUploading(false) }
   }
 
   const save = async () => {
-    if (!selectedPatient || !chiefComplaint) return
+    if (!selectedPatient || !chiefComplaint || uploading || saving) return
     setSaving(true)
     setSaveError('')
     setSaveSuccess(false)
@@ -124,7 +129,7 @@ export default function NewConsultation() {
           {/* Patient Select */}
           <div>
             <label style={{ display: 'block', color: '#2A2A2A', opacity: 0.7, fontFamily: 'Outfit, sans-serif', fontSize: '13px', marginBottom: '8px' }}>Patient</label>
-            <select value={selectedPatient} onChange={e => setSelectedPatient(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+            <select disabled={uploading || saving || photos.length > 0} value={selectedPatient} onChange={e => setSelectedPatient(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
               <option value="">Select patient...</option>
               {patients.map(p => <option key={p.id} value={p.id}>{p.full_name} ({p.email})</option>)}
             </select>
@@ -175,11 +180,11 @@ export default function NewConsultation() {
           {/* Photos */}
           <div>
             <label style={{ display: 'block', color: '#2A2A2A', opacity: 0.7, fontFamily: 'Outfit, sans-serif', fontSize: '13px', marginBottom: '8px' }}>Photos / Attachments</label>
-            <input type="file" multiple accept="image/*,.pdf" onChange={e => handlePhotoUpload(Array.from(e.target.files))}
+            <input type="file" multiple disabled={uploading || saving} accept="image/*,.pdf" onChange={e => handlePhotoUpload(Array.from(e.target.files))}
               style={{ color: '#2A2A2A', opacity: 0.7, fontFamily: 'Outfit, sans-serif', fontSize: '13px' }} />
             {photos.length > 0 && (
               <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
-                {photos.map((url, i) => <img key={i} src={url} alt="" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E5E5E5' }} />)}
+                <ConsultationAttachments photos={photos} patientId={selectedPatient} />
               </div>
             )}
           </div>
@@ -206,7 +211,7 @@ export default function NewConsultation() {
 
           <button
             onClick={save}
-            disabled={saving || !selectedPatient || !chiefComplaint}
+            disabled={saving || uploading || !selectedPatient || !chiefComplaint}
             style={{
               padding: '15px', minHeight: '50px',
               background: '#0A1628',
