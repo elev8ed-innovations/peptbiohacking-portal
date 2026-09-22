@@ -102,6 +102,7 @@ export default function DoctorDashboard() {
       .from("body_metrics")
       .select("*")
       .eq("patient_id", patientId)
+      .eq("status", "active")
       .order("recorded_at", { ascending: false })
     setBodyMetrics(data || [])
     setMetricForm(form => ({ ...form, height: data?.[0]?.height_cm ?? '' }))

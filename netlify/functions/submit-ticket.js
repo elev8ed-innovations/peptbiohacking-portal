@@ -10,14 +10,19 @@ const AIRTABLE_PAT = process.env.AIRTABLE_TOKEN || (() => {
 })();
 
 const BASE_ID = 'appKo9tyGtIju3UHN';
+const { requireDoctor, response } = require('./_doctor-auth');
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, body: '' };
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'POST only' }) };
+    return response(405, { error: 'POST only' });
   }
 
   try {
-    const { titulo, descripcion, prioridad, reporta } = JSON.parse(event.body);
+    const auth = await requireDoctor(event);
+    if (auth.error) return auth.error;
+
+    const { titulo, descripcion, prioridad } = JSON.parse(event.body);
     if (!titulo) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Titulo is required' }) };
     }
@@ -34,7 +39,7 @@ exports.handler = async (event) => {
             Titulo: titulo,
             Descripcion: descripcion || '',
             Prioridad: prioridad || 'Normal',
-            Reporta: reporta || 'Dr. V',
+            Reporta: auth.profile.full_name || 'Doctor',
             Estatus: 'Open',
             Fecha: new Date().toISOString().split('T')[0],
           }
@@ -47,13 +52,12 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
       body: JSON.stringify({ success: true, record: data.records?.[0] }),
     };
   } catch (err) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      ...response(500, { error: 'Ticket could not be submitted' }),
     };
   }
 };
