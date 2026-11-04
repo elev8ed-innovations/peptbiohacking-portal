@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../context/LanguageContext'
+import LoginVideoBackground from '../components/LoginVideoBackground'
+import './LoginVideoBackground.css'
 
 const inp = {
   width: '100%', padding: '13px 16px',
@@ -99,10 +101,11 @@ export default function Login() {
   // Gate screen
   if (!gateCleared) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-4 py-12">
+      <div className="portal-login-video-shell min-h-screen flex flex-col items-center justify-center px-4 py-12">
+        <LoginVideoBackground lang={lang} />
         <LangToggle />
         <div style={{ width: '100%', maxWidth: '420px' }}>
-          <Wordmark />
+          <div className="portal-login-wordmark"><Wordmark /></div>
           <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
             <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#0A1628', marginBottom: '4px' }}>
               {lang === 'es' ? 'Bienvenido' : 'Welcome'}
@@ -148,7 +151,7 @@ export default function Login() {
               {lang === 'es' ? 'Continuar al acceso' : 'Continue to access'}
             </button>
           </div>
-          <p style={{ textAlign: 'center', marginTop: '20px', color: '#2A2A2A', opacity: 0.3, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
+          <p style={{ textAlign: 'center', marginTop: '20px', color: '#fff', opacity: 0.9, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
             peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
           </p>
         </div>
@@ -158,10 +161,11 @@ export default function Login() {
 
   // Login form
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-4 py-12">
+    <div className="portal-login-video-shell min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <LoginVideoBackground lang={lang} />
       <LangToggle />
       <div style={{ width: '100%', maxWidth: '420px' }}>
-        <Wordmark />
+        <div className="portal-login-wordmark"><Wordmark /></div>
         <div style={{ background: '#fff', border: '1px solid #E5E5E5', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
           <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '24px', color: '#0A1628', marginBottom: '24px' }}>
             {lang === 'es' ? 'Iniciar sesión' : 'Sign In'}
@@ -206,7 +210,7 @@ export default function Login() {
             </Link>
           </p>
         </div>
-        <p style={{ textAlign: 'center', marginTop: '20px', color: '#2A2A2A', opacity: 0.3, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
+        <p style={{ textAlign: 'center', marginTop: '20px', color: '#fff', opacity: 0.9, fontSize: '11px', fontFamily: 'Outfit, sans-serif' }}>
           peptbiohacking.mx · {lang === 'es' ? 'Uso exclusivo para pacientes y médicos registrados' : 'Exclusive use for registered patients and physicians'}
         </p>
       </div>
